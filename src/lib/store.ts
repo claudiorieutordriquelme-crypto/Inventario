@@ -195,3 +195,7 @@ export function clearCloudSession() {
   state = emptyDb()
   emit()
 }
+
+export function getCurrentUserId(): string | null {
+  return currentUserId
+}

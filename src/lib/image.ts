@@ -1,3 +1,22 @@
+import type { Product } from './types'
+
+// Lista de imagenes del producto (galeria). Si solo hay portada legacy, la usa.
+export function imagesOf(p: Pick<Product, 'imagenes' | 'fotoUrl'>): string[] {
+  if (p.imagenes && p.imagenes.length) return p.imagenes
+  return p.fotoUrl ? [p.fotoUrl] : []
+}
+
+// Portada del producto (primera imagen).
+export function coverOf(p: Pick<Product, 'imagenes' | 'fotoUrl'>): string {
+  return imagesOf(p)[0] ?? ''
+}
+
+// Determina si una URL es un archivo de video reproducible directamente
+// (<video>). Los links de YouTube/Instagram/TikTok se abren en pestaña aparte.
+export function isPlayableVideo(url: string): boolean {
+  return /\.(mp4|webm|ogg|mov)(\?|#|$)/i.test(url || '')
+}
+
 // Convierte un archivo de imagen a un dataURL comprimido (redimensiona al lado
 // mayor `maxDim` y baja calidad) para poder guardar fotos locales sin inflar
 // la base de datos ni la sincronizacion con la nube.

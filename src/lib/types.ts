@@ -30,7 +30,10 @@ export interface Product {
   sku: string
   precio: number // CLP
   stock: number
-  fotoUrl: string // dataURL o URL externa
+  fotoUrl: string // portada (compat). Se mantiene sincronizada con imagenes[0].
+  imagenes?: string[] // galeria del producto (varias fotos). La primera es la portada.
+  videoUrl?: string // link a video breve (YouTube, Instagram, TikTok o .mp4)
+  descripcion?: string // descripcion breve del producto
   catalogoPublico: boolean
   bom: BomItem[]
   diasEntrega?: number // tiempo de entrega por encargo (dias). Opcional.
