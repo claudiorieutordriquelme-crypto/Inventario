@@ -20,14 +20,16 @@ import {
   Video,
   PlayCircle,
 } from 'lucide-react'
+import { motion } from 'framer-motion'
 import { useDb, getCurrentUserId } from '@/lib/store'
 import type { Product, ProductType } from '@/lib/types'
 import { updateProduct } from '@/lib/inventory'
 import { SectionTitle, Card, Badge, Modal, Field, EmptyState } from '@/components/ui'
 import { Lightbox } from '@/components/Lightbox'
 import { VideoModal } from '@/components/VideoModal'
+import { SmartImage } from '@/components/SmartImage'
 import { clp } from '@/lib/format'
-import { compressImage, coverOf, imagesOf } from '@/lib/image'
+import { compressImage, coverOf, imagesOf, isPlayableVideo } from '@/lib/image'
 import { compartir, linkWhatsApp, linkWhatsAppTo, INSTAGRAM_URL, TIKTOK_URL } from '@/lib/share'
 
 type Filtro = 'todos' | ProductType
@@ -149,10 +151,11 @@ export function CatalogPage() {
         />
       ) : (
         <div className="gap-4 [column-fill:_balance] columns-2 sm:columns-3 xl:columns-4">
-          {visibles.map((p) => (
+          {visibles.map((p, i) => (
             <div key={p.id} className="mb-4 break-inside-avoid">
               <ProductoCard
                 product={p}
+                index={i}
                 wsp={wsp}
                 onShare={() => setSharing(p)}
                 onGallery={() => setEditGallery(p)}
@@ -182,6 +185,7 @@ export function CatalogPage() {
 
 function ProductoCard({
   product: p,
+  index,
   wsp,
   onShare,
   onGallery,
@@ -189,6 +193,7 @@ function ProductoCard({
   onVideo,
 }: {
   product: Product
+  index: number
   wsp: string
   onShare: () => void
   onGallery: () => void
@@ -197,6 +202,8 @@ function ProductoCard({
 }) {
   const imgs = imagesOf(p)
   const cover = coverOf(p)
+  const [hover, setHover] = useState(false)
+  const previewVideo = p.videoUrl && isPlayableVideo(p.videoUrl)
 
   const pedir = () => {
     const texto = `Hola! Quiero encargar: ${p.nombre} (${clp(p.precio)}). Esta disponible?`
@@ -204,11 +211,30 @@ function ProductoCard({
   }
 
   return (
-    <div className="group card overflow-hidden !p-0">
+    <motion.div
+      className="group card overflow-hidden !p-0"
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, delay: Math.min(index * 0.04, 0.4), ease: 'easeOut' }}
+      whileHover={{ y: -4 }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+    >
       <div className="relative overflow-hidden">
         {cover ? (
           <button type="button" className="block w-full" onClick={() => onView(imgs)}>
-            <img src={cover} alt={p.nombre} loading="lazy" className="w-full transition-transform duration-300 group-hover:scale-105" />
+            <SmartImage src={cover} alt={p.nombre} imgClassName="transition-transform duration-300 group-hover:scale-105" />
+            {/* Preview de video en hover (tipo TikTok) para videos reproducibles */}
+            {previewVideo && hover && (
+              <video
+                src={p.videoUrl}
+                muted
+                loop
+                autoPlay
+                playsInline
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+            )}
           </button>
         ) : (
           <div className={`flex aspect-[4/5] w-full items-center justify-center bg-gradient-to-br ${gradientes[p.tipo]}`}>
@@ -272,7 +298,7 @@ function ProductoCard({
           </button>
         </div>
       </div>
-    </div>
+    </motion.div>
   )
 }
 

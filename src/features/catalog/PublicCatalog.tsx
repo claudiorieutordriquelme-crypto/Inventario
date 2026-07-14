@@ -6,9 +6,11 @@ import { supabase, isCloud } from '@/lib/supabase'
 import { getState } from '@/lib/store'
 import { clp } from '@/lib/format'
 import { linkWhatsAppTo } from '@/lib/share'
+import { motion } from 'framer-motion'
 import { coverOf, imagesOf } from '@/lib/image'
 import { Lightbox } from '@/components/Lightbox'
 import { VideoModal } from '@/components/VideoModal'
+import { SmartImage } from '@/components/SmartImage'
 
 // Vitrina publica de solo lectura. Se abre desde el link compartido, SIN login.
 // En modo nube lee los productos publicos del negocio (owner) via anon key
@@ -95,16 +97,21 @@ export function PublicCatalog() {
           </div>
         ) : (
           <div className="gap-4 [column-fill:_balance] columns-2 sm:columns-3 lg:columns-4">
-            {visibles.map((p) => {
+            {visibles.map((p, i) => {
               const imgs = imagesOf(p)
               const cover = coverOf(p)
               return (
               <div key={p.id} className="mb-4 break-inside-avoid">
-                <div className="overflow-hidden rounded-xl bg-surface shadow-card">
+                <motion.div
+                  className="overflow-hidden rounded-xl bg-surface shadow-card"
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.35, delay: Math.min(i * 0.04, 0.4), ease: 'easeOut' }}
+                >
                   <div className="relative">
                     {cover ? (
                       <button type="button" className="block w-full" onClick={() => setGallery(imgs)}>
-                        <img src={cover} alt={p.nombre} loading="lazy" className="w-full" />
+                        <SmartImage src={cover} alt={p.nombre} />
                       </button>
                     ) : (
                       <div className={`flex aspect-[4/5] w-full items-center justify-center bg-gradient-to-br ${gradientes[p.tipo]}`}>
@@ -141,7 +148,7 @@ export function PublicCatalog() {
                       <MessageCircle size={14} /> Pedir por WhatsApp
                     </button>
                   </div>
-                </div>
+                </motion.div>
               </div>
               )
             })}
