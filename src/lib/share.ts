@@ -29,6 +29,14 @@ export function linkWhatsApp(texto: string): string {
   return `https://wa.me/?text=${encodeURIComponent(texto)}`
 }
 
+// Link a un numero especifico (ej. el WhatsApp del negocio). Limpia todo lo
+// que no sea digito; si no hay numero, cae al selector de contacto.
+export function linkWhatsAppTo(numero: string, texto: string): string {
+  const soloDigitos = (numero || '').replace(/\D/g, '')
+  if (!soloDigitos) return linkWhatsApp(texto)
+  return `https://wa.me/${soloDigitos}?text=${encodeURIComponent(texto)}`
+}
+
 // Instagram y TikTok no permiten prellenar texto por URL; se abre la app/web
 // para publicar manualmente. El texto queda copiado al portapapeles.
 export const INSTAGRAM_URL = 'https://www.instagram.com/'

@@ -43,17 +43,17 @@ export function buildSeed(): Database {
   const products = [
     {
       id: 'prod-1', nombre: 'Amigurumi conejo', tipo: 'crochet' as const, sku: 'CRO-001',
-      precio: 15900, stock: 3, fotoUrl: '', catalogoPublico: true,
+      precio: 15900, stock: 3, fotoUrl: '', catalogoPublico: true, diasEntrega: 7,
       bom: [{ materialId: 'mat-1', cantidad: 2 }], createdAt: iso(-25),
     },
     {
       id: 'prod-2', nombre: 'Chaleco tejido a mano', tipo: 'crochet' as const, sku: 'CRO-002',
-      precio: 39900, stock: 1, fotoUrl: '', catalogoPublico: true,
+      precio: 39900, stock: 1, fotoUrl: '', catalogoPublico: true, diasEntrega: 21,
       bom: [{ materialId: 'mat-2', cantidad: 3 }], createdAt: iso(-20),
     },
     {
       id: 'prod-3', nombre: 'Polera estampada logo', tipo: 'estampado' as const, sku: 'EST-001',
-      precio: 12900, stock: 8, fotoUrl: '', catalogoPublico: false,
+      precio: 12900, stock: 8, fotoUrl: '', catalogoPublico: false, diasEntrega: 5,
       bom: [{ materialId: 'mat-3', cantidad: 1 }, { materialId: 'mat-4', cantidad: 0.05 }],
       createdAt: iso(-10),
     },

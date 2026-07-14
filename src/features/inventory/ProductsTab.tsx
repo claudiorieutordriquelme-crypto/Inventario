@@ -10,7 +10,7 @@ const TIPOS: ProductType[] = ['crochet', 'estampado', 'otro']
 
 const empty: Omit<Product, 'id' | 'createdAt'> = {
   nombre: '', tipo: 'crochet', sku: '', precio: 0, stock: 0, fotoUrl: '',
-  catalogoPublico: false, bom: [],
+  catalogoPublico: false, bom: [], diasEntrega: 7,
 }
 
 export function ProductsTab() {
@@ -132,6 +132,9 @@ function ProductForm({
         <Field label="Stock inicial">
           <input type="number" className="input" value={f.stock} onChange={(e) => set('stock', Number(e.target.value))} />
         </Field>
+        <Field label="Dias de entrega (por encargo)">
+          <input type="number" className="input" value={f.diasEntrega ?? 0} onChange={(e) => set('diasEntrega', Number(e.target.value))} />
+        </Field>
         <div className="col-span-2">
           <Field label="URL de foto (opcional)">
             <input className="input" value={f.fotoUrl} onChange={(e) => set('fotoUrl', e.target.value)} placeholder="https://..." />
@@ -175,7 +178,7 @@ function ProductForm({
           onClick={() => onSave({
             nombre: f.nombre, tipo: f.tipo as ProductType, sku: f.sku, precio: f.precio,
             stock: f.stock, fotoUrl: f.fotoUrl, catalogoPublico: f.catalogoPublico,
-            bom: f.bom as BomItem[],
+            bom: f.bom as BomItem[], diasEntrega: f.diasEntrega,
           })}
         >
           Guardar

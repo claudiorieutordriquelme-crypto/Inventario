@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Search,
   Share2,
@@ -11,6 +11,8 @@ import {
   Copy,
   Link as LinkIcon,
   Package,
+  Clock,
+  Phone,
 } from 'lucide-react'
 import { useDb } from '@/lib/store'
 import type { Product, ProductType } from '@/lib/types'
@@ -18,15 +20,22 @@ import { updateProduct } from '@/lib/inventory'
 import { SectionTitle, Card, Badge, Modal, Field, EmptyState } from '@/components/ui'
 import { clp } from '@/lib/format'
 import { compressImage } from '@/lib/image'
-import { compartir, linkWhatsApp, INSTAGRAM_URL, TIKTOK_URL } from '@/lib/share'
+import { compartir, linkWhatsAppTo, INSTAGRAM_URL, TIKTOK_URL } from '@/lib/share'
 
 type Filtro = 'todos' | ProductType
 
-// Gradiente de portada segun tipo, para verse como catalogo aunque no haya foto.
+// WhatsApp del negocio (donde llegan los pedidos). Se guarda local en el equipo.
+const WSP_KEY = 'artesania:whatsapp'
+
 const gradientes: Record<ProductType, string> = {
   crochet: 'from-primary to-primary-900',
   estampado: 'from-accent to-primary',
   otro: 'from-secondary to-primary',
+}
+
+function entregaLabel(p: Product): string {
+  if (p.diasEntrega && p.diasEntrega > 0) return `Por encargo - ${p.diasEntrega} dias`
+  return 'Por encargo'
 }
 
 export function CatalogPage() {
@@ -36,6 +45,15 @@ export function CatalogPage() {
   const [soloPublicos, setSoloPublicos] = useState(false)
   const [sharing, setSharing] = useState<Product | null>(null)
   const [editImg, setEditImg] = useState<Product | null>(null)
+  const [wsp, setWsp] = useState('')
+
+  useEffect(() => {
+    setWsp(localStorage.getItem(WSP_KEY) ?? '')
+  }, [])
+  const guardarWsp = (v: string) => {
+    setWsp(v)
+    localStorage.setItem(WSP_KEY, v)
+  }
 
   const visibles = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -56,7 +74,22 @@ export function CatalogPage() {
 
   return (
     <div className="space-y-6">
-      <SectionTitle title="Catalogo" sub="Vitrina de productos para compartir en redes sociales" />
+      <SectionTitle title="Catalogo" sub="Vitrina de productos por encargo, lista para compartir en redes" />
+
+      {/* Configurar WhatsApp del negocio */}
+      {!wsp && (
+        <div className="rounded-xl border-l-4 border-l-accent bg-accent-50 p-4">
+          <p className="text-sm font-semibold text-ink">Configura tu WhatsApp para recibir pedidos</p>
+          <p className="mb-2 text-xs text-ink-soft">Los botones "Pedir por WhatsApp" abriran una conversacion a este numero.</p>
+          <div className="flex gap-2">
+            <input
+              className="input max-w-xs"
+              placeholder="+56 9 XXXX XXXX"
+              onBlur={(e) => e.target.value && guardarWsp(e.target.value)}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Barra de filtros */}
       <Card className="!p-4">
@@ -88,6 +121,15 @@ export function CatalogPage() {
             Solo publicados
           </label>
         </div>
+        {wsp && (
+          <div className="mt-3 flex items-center gap-2 border-t border-surface-border pt-3 text-sm text-ink-soft">
+            <Phone size={14} className="text-secondary" />
+            Pedidos a: <b className="text-ink">{wsp}</b>
+            <button className="ml-2 text-xs font-semibold text-primary hover:underline" onClick={() => guardarWsp('')}>
+              cambiar
+            </button>
+          </div>
+        )}
       </Card>
 
       {visibles.length === 0 ? (
@@ -96,19 +138,22 @@ export function CatalogPage() {
           hint="Crea productos en Inventario o ajusta los filtros. Agrega fotos para armar tu vitrina."
         />
       ) : (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
+        // Masonry con CSS columns: respeta el alto natural de cada foto.
+        <div className="gap-4 [column-fill:_balance] columns-2 sm:columns-3 xl:columns-4">
           {visibles.map((p) => (
-            <ProductoCard
-              key={p.id}
-              product={p}
-              onShare={() => setSharing(p)}
-              onImage={() => setEditImg(p)}
-            />
+            <div key={p.id} className="mb-4 break-inside-avoid">
+              <ProductoCard
+                product={p}
+                wsp={wsp}
+                onShare={() => setSharing(p)}
+                onImage={() => setEditImg(p)}
+              />
+            </div>
           ))}
         </div>
       )}
 
-      {sharing && <ShareModal product={sharing} onClose={() => setSharing(null)} />}
+      {sharing && <ShareModal product={sharing} wsp={wsp} onClose={() => setSharing(null)} />}
       {editImg && <ImageModal product={editImg} onClose={() => setEditImg(null)} />}
     </div>
   )
@@ -116,33 +161,39 @@ export function CatalogPage() {
 
 function ProductoCard({
   product: p,
+  wsp,
   onShare,
   onImage,
 }: {
   product: Product
+  wsp: string
   onShare: () => void
   onImage: () => void
 }) {
+  const pedir = () => {
+    const texto = `Hola! Quiero encargar: ${p.nombre} (${clp(p.precio)}). Esta disponible?`
+    window.open(linkWhatsAppTo(wsp, texto), '_blank')
+  }
+
   return (
-    <div className="group card flex flex-col overflow-hidden !p-0">
-      {/* Portada */}
-      <div className="relative aspect-[4/5] overflow-hidden">
+    <div className="group card overflow-hidden !p-0">
+      {/* Portada (alto natural en fotos reales, aspecto fijo en placeholder) */}
+      <div className="relative overflow-hidden">
         {p.fotoUrl ? (
           <img
             src={p.fotoUrl}
             alt={p.nombre}
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            loading="lazy"
+            className="w-full transition-transform duration-300 group-hover:scale-105"
           />
         ) : (
-          <div className={`flex h-full w-full items-center justify-center bg-gradient-to-br ${gradientes[p.tipo]}`}>
+          <div className={`flex aspect-[4/5] w-full items-center justify-center bg-gradient-to-br ${gradientes[p.tipo]}`}>
             <span className="px-3 text-center text-lg font-extrabold text-white/90">{p.nombre}</span>
           </div>
         )}
-        {/* Precio */}
         <div className="absolute bottom-2 left-2 rounded-lg bg-surface/95 px-2.5 py-1 text-sm font-extrabold text-ink shadow-card">
           {clp(p.precio)}
         </div>
-        {/* Estado publico */}
         <div className="absolute right-2 top-2">
           <button
             onClick={() => updateProduct(p.id, { catalogoPublico: !p.catalogoPublico })}
@@ -154,7 +205,6 @@ function ProductoCard({
             {p.catalogoPublico ? <Eye size={12} /> : <EyeOff size={12} />}
           </button>
         </div>
-        {/* Boton imagen (aparece al hover) */}
         <button
           onClick={onImage}
           className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-ink/70 px-2 py-1 text-xs font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100"
@@ -163,18 +213,24 @@ function ProductoCard({
           <ImagePlus size={12} /> Foto
         </button>
       </div>
+
       {/* Info */}
-      <div className="flex flex-1 flex-col p-3">
+      <div className="p-3">
         <div className="flex items-start justify-between gap-2">
           <p className="text-sm font-bold leading-tight text-ink">{p.nombre}</p>
           <Badge tone={p.tipo === 'estampado' ? 'accent' : 'primary'}>{p.tipo}</Badge>
         </div>
-        <p className="mt-0.5 text-xs text-ink-faint">
-          {p.sku || 'sin SKU'} - stock {p.stock}
+        <p className="mt-1 flex items-center gap-1 text-xs text-ink-faint">
+          <Clock size={12} /> {entregaLabel(p)}
         </p>
-        <button className="btn-primary mt-3 w-full !py-1.5 text-xs" onClick={onShare}>
-          <Share2 size={14} /> Compartir
-        </button>
+        <div className="mt-3 flex gap-2">
+          <button className="btn-accent flex-1 !py-1.5 text-xs" onClick={pedir}>
+            <MessageCircle size={14} /> Pedir
+          </button>
+          <button className="btn-outline !px-2.5 !py-1.5" onClick={onShare} title="Compartir">
+            <Share2 size={14} />
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -190,8 +246,7 @@ function ImageModal({ product, onClose }: { product: Product; onClose: () => voi
     setBusy(true)
     setError('')
     try {
-      const dataUrl = await compressImage(file)
-      setUrl(dataUrl)
+      setUrl(await compressImage(file))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error al procesar la imagen')
     } finally {
@@ -248,9 +303,9 @@ function ImageModal({ product, onClose }: { product: Product; onClose: () => voi
   )
 }
 
-function ShareModal({ product, onClose }: { product: Product; onClose: () => void }) {
+function ShareModal({ product, wsp, onClose }: { product: Product; wsp: string; onClose: () => void }) {
   const [msg, setMsg] = useState('')
-  const texto = `${product.nombre} - ${clp(product.precio)}. Disponible por encargo, escribenos!`
+  const texto = `${product.nombre} - ${clp(product.precio)}. ${entregaLabel(product)}. Escribenos para encargar!`
 
   const nativo = async () => {
     const r = await compartir({ titulo: product.nombre, texto })
@@ -264,13 +319,13 @@ function ShareModal({ product, onClose }: { product: Product; onClose: () => voi
   return (
     <Modal open onClose={onClose} title={`Compartir: ${product.nombre}`}>
       {product.fotoUrl && (
-        <img src={product.fotoUrl} alt={product.nombre} className="mb-3 h-40 w-full rounded-lg object-cover" />
+        <img src={product.fotoUrl} alt={product.nombre} className="mb-3 max-h-56 w-full rounded-lg object-cover" />
       )}
       <div className="rounded-lg bg-surface-muted p-3 text-sm text-ink-soft">{texto}</div>
       <div className="mt-4 grid grid-cols-2 gap-2">
         <button className="btn-primary" onClick={nativo}><Share2 size={16} /> Compartir</button>
         <button className="btn-outline" onClick={copiar}><Copy size={16} /> Copiar texto</button>
-        <button className="btn-outline" onClick={() => abrir(linkWhatsApp(texto))}><MessageCircle size={16} /> WhatsApp</button>
+        <button className="btn-outline" onClick={() => abrir(linkWhatsAppTo(wsp, texto))}><MessageCircle size={16} /> WhatsApp</button>
         <button className="btn-outline" onClick={() => { copiar(); abrir(INSTAGRAM_URL) }}><Instagram size={16} /> Instagram</button>
         <button className="btn-outline col-span-2" onClick={() => { copiar(); abrir(TIKTOK_URL) }}><Music2 size={16} /> TikTok</button>
       </div>

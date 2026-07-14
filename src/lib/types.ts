@@ -33,6 +33,7 @@ export interface Product {
   fotoUrl: string // dataURL o URL externa
   catalogoPublico: boolean
   bom: BomItem[]
+  diasEntrega?: number // tiempo de entrega por encargo (dias). Opcional.
   createdAt: string
 }
 
