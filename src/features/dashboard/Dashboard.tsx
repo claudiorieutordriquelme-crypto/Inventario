@@ -1,10 +1,10 @@
 import { Link } from 'react-router-dom'
-import { Clock, TrendingUp, Wallet, AlertTriangle, Truck } from 'lucide-react'
+import { Clock, TrendingUp, Wallet, AlertTriangle, Truck, CalendarCheck } from 'lucide-react'
 import { useDb } from '@/lib/store'
 import { Card, StatTile, SectionTitle, Badge } from '@/components/ui'
 import { clp, num, fechaCorta, diasHasta } from '@/lib/format'
 import { valorInventario, materialesEnAlerta } from '@/lib/inventory'
-import { cycleTime, tasaConversion, pipelineValor, stagesOrdenadas, ordersPorEtapa, ventasPorMes } from '@/lib/funnel'
+import { cycleTime, tasaConversion, pipelineValor, stagesOrdenadas, ordersPorEtapa, ventasPorMes, cumplimientoPlazo } from '@/lib/funnel'
 import { entregasPendientes } from '@/lib/notifications'
 
 export function Dashboard() {
@@ -19,6 +19,7 @@ export function Dashboard() {
   const ventas = ventasPorMes(db, 6)
   const maxVenta = Math.max(1, ...ventas.map((v) => v.total))
   const totalVentas = ventas.reduce((s, v) => s + v.total, 0)
+  const plazo = cumplimientoPlazo(db)
 
   return (
     <div className="space-y-6">
@@ -27,7 +28,7 @@ export function Dashboard() {
         sub="Vision general de inventario, ventas y entregas"
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <StatTile
           label="Valor inventario"
           value={clp(valorInventario(db))}
@@ -55,6 +56,13 @@ export function Dashboard() {
           hint="Pedidos entregados / total"
           icon={<TrendingUp size={22} />}
           tone="accent"
+        />
+        <StatTile
+          label="Cumplimiento de plazo"
+          value={plazo.entregados ? `${num(plazo.tasa * 100)}%` : 's/d'}
+          hint={plazo.entregados ? `${plazo.aTiempo}/${plazo.entregados} entregas con plazo a tiempo` : 'Sin entregas con plazo'}
+          icon={<CalendarCheck size={22} />}
+          tone={plazo.entregados && plazo.tasa < 0.8 ? 'accent' : 'secondary'}
         />
       </div>
 

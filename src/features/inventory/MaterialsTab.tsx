@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Plus, Pencil, Trash2, ArrowDownUp } from 'lucide-react'
-import { useDb } from '@/lib/store'
+import { useDb, getState } from '@/lib/store'
 import type { Material, MaterialCategory } from '@/lib/types'
 import { Card, Badge, Modal, Field, EmptyState } from '@/components/ui'
 import { clp } from '@/lib/format'
@@ -10,7 +10,18 @@ import {
   deleteMaterial,
   ajustarStockMaterial,
   stockStatus,
+  usosDeMaterial,
 } from '@/lib/inventory'
+
+// Confirma el borrado advirtiendo si el insumo esta en recetas (dejaria costos
+// subestimados en esos productos/ideas).
+function confirmarBorrado(m: Material): boolean {
+  const usos = usosDeMaterial(getState(), m.id)
+  const aviso = usos > 0
+    ? `"${m.nombre}" se usa en ${usos} receta(s). Si lo eliminas, el costo y margen de esos productos/ideas quedaran subestimados. Eliminar igual?`
+    : `Eliminar ${m.nombre}?`
+  return confirm(aviso)
+}
 
 const CATEGORIAS: MaterialCategory[] = ['lana', 'hilo', 'tela', 'tinta', 'insumo']
 
@@ -78,7 +89,7 @@ export function MaterialsTab() {
                           <button
                             className="btn-ghost !p-1.5 text-accent"
                             title="Eliminar"
-                            onClick={() => { if (confirm(`Eliminar ${m.nombre}?`)) deleteMaterial(m.id) }}
+                            onClick={() => { if (confirmarBorrado(m)) deleteMaterial(m.id) }}
                           >
                             <Trash2 size={16} />
                           </button>

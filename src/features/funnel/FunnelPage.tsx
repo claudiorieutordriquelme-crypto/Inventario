@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Plus, Clock, TrendingUp, Wallet, ChevronRight } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Plus, Clock, TrendingUp, Wallet, ChevronRight, Lightbulb, Factory } from 'lucide-react'
 import { useDb } from '@/lib/store'
 import type { Order } from '@/lib/types'
 import { SectionTitle, StatTile, Modal, Field, Badge, Card } from '@/components/ui'
@@ -16,6 +17,7 @@ import {
   deleteOrder,
   montoDeProductos,
 } from '@/lib/funnel'
+import { IDEA_STAGES, ideasPorStage } from '@/lib/planning'
 
 export function FunnelPage() {
   const db = useDb((d) => d)
@@ -24,6 +26,7 @@ export function FunnelPage() {
   const [editing, setEditing] = useState<Order | null>(null)
   const [creating, setCreating] = useState(false)
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [vista, setVista] = useState<'venta' | 'manufactura'>('venta')
 
   const maxCount = Math.max(1, ...stages.map((s) => ordersPorEtapa(db, s.id).length))
   const totalQ = db.orders.length
@@ -31,13 +34,36 @@ export function FunnelPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <SectionTitle title="Funnel de ventas" sub="Pipeline por etapas con tiempo de ciclo (cycle time)" />
-        <button className="btn-primary" onClick={() => setCreating(true)}>
-          <Plus size={16} /> Nuevo pedido
-        </button>
+      <SectionTitle title="Funnel" sub="Embudo de venta y de manufactura" />
+
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex gap-1 border-b border-surface-border">
+          {([
+            { id: 'venta', label: 'Venta', icon: TrendingUp },
+            { id: 'manufactura', label: 'Manufactura', icon: Factory },
+          ] as const).map((t) => (
+            <button
+              key={t.id}
+              onClick={() => { setVista(t.id); setExpanded(null) }}
+              className={`-mb-px flex items-center gap-1.5 border-b-2 px-4 py-2 text-sm font-semibold transition-colors ${
+                vista === t.id ? 'border-primary text-primary' : 'border-transparent text-ink-faint hover:text-ink'
+              }`}
+            >
+              <t.icon size={15} /> {t.label}
+            </button>
+          ))}
+        </div>
+        {vista === 'venta' && (
+          <button className="btn-primary" onClick={() => setCreating(true)}>
+            <Plus size={16} /> Nuevo pedido
+          </button>
+        )}
       </div>
 
+      {vista === 'manufactura' ? (
+        <FunnelManufactura />
+      ) : (
+      <>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatTile label="Cycle time promedio" value={cycle.n ? `${num(cycle.promedioDias)} dias` : 's/d'} hint={cycle.n ? `Mediana ${num(cycle.medianaDias)} d - n=${cycle.n} entregas` : 'Aun sin entregas'} icon={<Clock size={20} />} />
         <StatTile label="Valor pipeline" value={clp(pipelineValor(db))} hint="Pedidos no entregados" icon={<Wallet size={20} />} tone="secondary" />
@@ -120,6 +146,8 @@ export function FunnelPage() {
           <span className="w-24 shrink-0 text-right text-sm font-extrabold text-ink sm:w-28">{clp(totalMonto)}</span>
         </div>
       </Card>
+      </>
+      )}
 
       {(creating || editing) && (
         <OrderForm order={editing} onClose={() => { setCreating(false); setEditing(null) }} />
@@ -128,7 +156,112 @@ export function FunnelPage() {
   )
 }
 
-function OrderForm({ order, onClose }: { order: Order | null; onClose: () => void }) {
+// Embudo de manufactura: ideas/productos en desarrollo por etapa, con Q (cantidad)
+// y $ (valor estimado = suma de precioEstimado). Lee los datos de Planning.
+function FunnelManufactura() {
+  const db = useDb((d) => d)
+  const [expanded, setExpanded] = useState<string | null>(null)
+
+  const conteos = IDEA_STAGES.map((s) => ideasPorStage(db, s.id).length)
+  const maxCount = Math.max(1, ...conteos)
+  const totalQ = db.ideas.length
+  const totalValor = db.ideas.reduce((s, i) => s + (i.precioEstimado ?? 0), 0)
+  const enProduccion = ideasPorStage(db, 'produccion').length
+  const listas = ideasPorStage(db, 'listo').length
+  // KPIs de cabecera = trabajo en curso (excluye 'listo', que ya paso a Inventario)
+  const enDesarrollo = db.ideas.filter((i) => i.stage !== 'listo')
+  const valorDesarrollo = enDesarrollo.reduce((s, i) => s + (i.precioEstimado ?? 0), 0)
+
+  return (
+    <>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <StatTile label="Ideas en desarrollo" value={String(enDesarrollo.length)} hint="En pipeline (excluye Listo)" icon={<Lightbulb size={20} />} />
+        <StatTile label="En produccion" value={String(enProduccion)} hint={`${listas} listas`} icon={<Factory size={20} />} tone="secondary" />
+        <StatTile label="Valor estimado" value={clp(valorDesarrollo)} hint="Suma estimada (excluye Listo)" icon={<Wallet size={20} />} tone="accent" />
+      </div>
+
+      <Card className="!p-4">
+        <div className="mb-2 flex items-center justify-end">
+          <Link to="/planning" className="text-sm font-semibold text-primary hover:underline">Gestionar en Planning</Link>
+        </div>
+        <div className="mb-1 flex items-center gap-3 px-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">
+          <span className="w-4 shrink-0" />
+          <span className="w-24 shrink-0 sm:w-28">Etapa</span>
+          <span className="hidden flex-1 sm:block" />
+          <span className="w-10 shrink-0 text-right">Q</span>
+          <span className="w-24 shrink-0 text-right sm:w-28">$</span>
+        </div>
+
+        <div className="space-y-0.5">
+          {IDEA_STAGES.map((s) => {
+            const ideas = ideasPorStage(db, s.id)
+            const valor = ideas.reduce((sum, i) => sum + (i.precioEstimado ?? 0), 0)
+            const pct = (ideas.length / maxCount) * 100
+            const isOpen = expanded === s.id
+            const esFinal = s.id === 'listo'
+            return (
+              <div key={s.id}>
+                <button
+                  onClick={() => setExpanded(isOpen ? null : s.id)}
+                  className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-surface-muted"
+                >
+                  <ChevronRight size={16} className={`shrink-0 text-ink-faint transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+                  <span className="w-24 shrink-0 truncate text-sm font-semibold text-ink sm:w-28">{s.label}</span>
+                  <span className="hidden h-6 flex-1 overflow-hidden rounded-md bg-surface-muted sm:block">
+                    <span
+                      className={`block h-full rounded-md ${esFinal ? 'bg-secondary' : 'bg-primary'}`}
+                      style={{ width: `${ideas.length ? Math.max(pct, 8) : 0}%` }}
+                    />
+                  </span>
+                  <span className="w-10 shrink-0 text-right text-sm font-bold text-ink">{ideas.length}</span>
+                  <span className="w-24 shrink-0 text-right text-sm font-bold text-ink sm:w-28">{clp(valor)}</span>
+                </button>
+
+                {isOpen && (
+                  <div className="mb-1 ml-7 mt-0.5 space-y-0.5 border-l border-surface-border pl-3">
+                    {ideas.length === 0 ? (
+                      <p className="px-2 py-1.5 text-xs text-ink-faint">Sin ideas en esta etapa</p>
+                    ) : (
+                      ideas.map((i) => (
+                        <Link
+                          key={i.id}
+                          to="/planning"
+                          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-surface-muted"
+                        >
+                          <span className="flex-1 truncate text-sm text-ink">{i.titulo}</span>
+                          <Badge tone={i.prioridad === 'alta' ? 'accent' : 'neutral'}>{i.prioridad}</Badge>
+                          <span className="w-24 text-right text-sm font-semibold text-ink">{clp(i.precioEstimado ?? 0)}</span>
+                        </Link>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+        <div className="mt-1 flex items-center gap-3 border-t border-surface-border px-2 pt-2">
+          <span className="w-4 shrink-0" />
+          <span className="w-24 shrink-0 text-sm font-bold text-ink sm:w-28">Total</span>
+          <span className="hidden flex-1 sm:block" />
+          <span className="w-10 shrink-0 text-right text-sm font-extrabold text-ink">{totalQ}</span>
+          <span className="w-24 shrink-0 text-right text-sm font-extrabold text-ink sm:w-28">{clp(totalValor)}</span>
+        </div>
+      </Card>
+    </>
+  )
+}
+
+export function OrderForm({
+  order,
+  onClose,
+  initialFecha,
+}: {
+  order: Order | null
+  onClose: () => void
+  initialFecha?: string
+}) {
   const db = useDb((d) => d)
   const stages = stagesOrdenadas(db)
   const [f, setF] = useState(() =>
@@ -140,7 +273,7 @@ function OrderForm({ order, onClose }: { order: Order | null; onClose: () => voi
           stageId: stages[0]?.id ?? '',
           monto: 0,
           productos: [] as Order['productos'],
-          fechaComprometida: '',
+          fechaComprometida: initialFecha ? initialFecha.slice(0, 10) : '',
           notas: '',
         },
   )
@@ -158,7 +291,9 @@ function OrderForm({ order, onClose }: { order: Order | null; onClose: () => voi
     f.productos.find((l) => l.productId === productId)?.cantidad ?? 0
 
   const guardar = () => {
-    const fechaIso = f.fechaComprometida ? new Date(f.fechaComprometida).toISOString() : null
+    // Anclar a mediodia LOCAL para evitar desfase de dia por timezone (Chile
+    // esta detras de UTC): asi el dia calendario local coincide en calendario y KPIs.
+    const fechaIso = f.fechaComprometida ? new Date(`${f.fechaComprometida}T12:00:00`).toISOString() : null
     if (order) {
       // si cambio la etapa, usar moverEtapa para registrar historial y rebaja
       if (f.stageId !== order.stageId) moverEtapa(order.id, f.stageId)

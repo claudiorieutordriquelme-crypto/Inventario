@@ -37,6 +37,7 @@ export interface Product {
   catalogoPublico: boolean
   bom: BomItem[]
   diasEntrega?: number // tiempo de entrega por encargo (dias). Opcional.
+  ideaId?: string // origen en Planning, si el producto nacio de una idea (evita duplicados)
   createdAt: string
 }
 
@@ -116,6 +117,8 @@ export interface ProjectIdea {
   stage: IdeaStage
   prioridad: Prioridad
   notas: string
+  bom?: BomItem[] // receta de insumos necesarios (para estimar costo)
+  precioEstimado?: number // precio de venta estimado (para estimar margen)
   productoCreado?: boolean // true cuando ya paso a Inventario como producto
   createdAt: string
 }

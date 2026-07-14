@@ -41,6 +41,30 @@ export function cycleTime(db: Database): CycleMetrics {
   }
 }
 
+export interface CumplimientoPlazo {
+  entregados: number
+  aTiempo: number
+  atrasados: number
+  tasa: number // aTiempo / entregados
+}
+
+// Cumplimiento de plazo: de los pedidos entregados con fecha comprometida,
+// cuantos se entregaron a tiempo (mismo dia o antes). Compara por dia calendario
+// LOCAL (clave YYYYMMDD) para no sesgar por timezone: entregadoAt es un instante
+// real y en Chile (detras de UTC) el dia UTC se correria hacia adelante.
+export function cumplimientoPlazo(db: Database): CumplimientoPlazo {
+  const dia = (iso: string) => {
+    const d = new Date(iso)
+    return d.getFullYear() * 10000 + d.getMonth() * 100 + d.getDate()
+  }
+  const conFecha = db.orders.filter((o) => o.entregadoAt && o.fechaComprometida)
+  const aTiempo = conFecha.filter(
+    (o) => dia(o.entregadoAt as string) <= dia(o.fechaComprometida as string),
+  ).length
+  const entregados = conFecha.length
+  return { entregados, aTiempo, atrasados: entregados - aTiempo, tasa: entregados ? aTiempo / entregados : 0 }
+}
+
 // Tasa de conversion: pedidos en etapa ganada / total.
 export function tasaConversion(db: Database): number {
   const ganadaIds = new Set(db.stages.filter((s) => s.esGanada).map((s) => s.id))

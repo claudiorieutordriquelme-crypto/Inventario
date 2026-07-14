@@ -3,6 +3,7 @@ import { Plus, Pencil, Trash2, Factory, Share2 } from 'lucide-react'
 import { useDb } from '@/lib/store'
 import type { Product, ProductType, BomItem } from '@/lib/types'
 import { Card, Badge, Modal, Field, EmptyState } from '@/components/ui'
+import { BomEditor } from '@/components/BomEditor'
 import { clp, num } from '@/lib/format'
 import {
   addProduct,
@@ -123,14 +124,6 @@ function ProductForm({
   const [margenObjetivo, setMargenObjetivo] = useState(60)
   const set = (k: keyof typeof f, v: unknown) => setF((s) => ({ ...s, [k]: v }))
 
-  const setBom = (materialId: string, cantidad: number) => {
-    setF((s) => {
-      const rest = s.bom.filter((b) => b.materialId !== materialId)
-      return { ...s, bom: cantidad > 0 ? [...rest, { materialId, cantidad }] : rest }
-    })
-  }
-  const bomFor = (id: string): number => f.bom.find((b) => b.materialId === id)?.cantidad ?? 0
-
   // Costo y margen en vivo segun la receta y el precio actual.
   const costo = costoProducto(materials, f.bom)
   const { margenMonto, margenPct } = margenProducto(materials, f.bom, f.precio)
@@ -176,38 +169,7 @@ function ProductForm({
 
       <div className="mt-5">
         <p className="label">Receta de insumos (BOM) - cantidad usada por unidad producida</p>
-        {materials.length === 0 ? (
-          <p className="text-sm text-ink-faint">Primero registra insumos en la pestana Insumos.</p>
-        ) : (
-          <div className="rounded-lg border border-surface-border">
-            <div className="flex items-center gap-3 border-b border-surface-border bg-surface-muted px-3 py-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">
-              <span className="flex-1">Insumo</span>
-              <span className="w-24 text-right">Cantidad</span>
-              <span className="w-24 text-right">Costo linea</span>
-            </div>
-            <div className="max-h-56 space-y-2 overflow-y-auto p-3">
-              {materials.map((m) => {
-                const cant = bomFor(m.id)
-                return (
-                  <div key={m.id} className="flex items-center gap-3">
-                    <span className="flex-1 text-sm text-ink-soft">
-                      {m.nombre}{' '}
-                      <span className="text-xs text-ink-faint">({m.unidad} - {clp(m.costoUnitario)}/{m.unidad})</span>
-                    </span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      className="input w-24"
-                      value={cant}
-                      onChange={(e) => setBom(m.id, Number(e.target.value))}
-                    />
-                    <span className="w-24 text-right text-sm text-ink">{cant > 0 ? clp(cant * m.costoUnitario) : '-'}</span>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
+        <BomEditor materials={materials} bom={f.bom} onChange={(bom) => set('bom', bom)} />
       </div>
 
       {/* Costo, margen y precio sugerido */}

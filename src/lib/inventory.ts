@@ -44,6 +44,21 @@ export function costoProducto(materials: Material[], bom: BomItem[]): number {
   }, 0)
 }
 
+// Lineas del BOM cuyo material ya no existe en inventario (fue eliminado o el id
+// es invalido). Si hay faltantes, el costo esta subestimado y el margen NO es
+// confiable: la UI debe advertirlo en vez de mostrar un margen inflado.
+export function materialesFaltantes(materials: Material[], bom: BomItem[]): BomItem[] {
+  return bom.filter((b) => !materials.some((m) => m.id === b.materialId))
+}
+
+// Cuenta cuantos productos e ideas referencian un material en su receta.
+// Sirve para advertir antes de eliminar un insumo.
+export function usosDeMaterial(db: Database, materialId: string): number {
+  const enProductos = db.products.filter((p) => p.bom.some((b) => b.materialId === materialId)).length
+  const enIdeas = db.ideas.filter((i) => (i.bom ?? []).some((b) => b.materialId === materialId)).length
+  return enProductos + enIdeas
+}
+
 export interface MargenInfo {
   costo: number
   margenMonto: number // precio - costo

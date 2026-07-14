@@ -1,9 +1,12 @@
 import { useState } from 'react'
 import { Plus, ChevronLeft, ChevronRight, Pencil, CheckCircle2 } from 'lucide-react'
 import { useDb } from '@/lib/store'
-import type { ProjectIdea, IdeaStage, Prioridad } from '@/lib/types'
+import type { BomItem, ProjectIdea, IdeaStage, Prioridad } from '@/lib/types'
 import { SectionTitle, Badge, Modal, Field, EmptyState } from '@/components/ui'
+import { BomEditor } from '@/components/BomEditor'
 import { IDEA_STAGES, ideasPorStage, addIdea, updateIdea, deleteIdea, moverIdea } from '@/lib/planning'
+import { costoProducto, margenProducto, precioSugerido } from '@/lib/inventory'
+import { clp, num } from '@/lib/format'
 
 const prioridadTone: Record<Prioridad, 'accent' | 'primary' | 'neutral'> = {
   alta: 'accent',
@@ -51,6 +54,19 @@ export function PlanningPage() {
                           <Badge tone={prioridadTone[idea.prioridad]}>{idea.prioridad}</Badge>
                         </div>
                         {idea.descripcion && <p className="mt-1 line-clamp-2 text-xs text-ink-faint">{idea.descripcion}</p>}
+                        {idea.bom && idea.bom.length > 0 && (() => {
+                          const { costo, margenPct } = margenProducto(db.materials, idea.bom ?? [], idea.precioEstimado ?? 0)
+                          return (
+                            <div className="mt-2 flex items-center justify-between rounded-md bg-surface-muted px-2 py-1 text-[11px]">
+                              <span className="text-ink-faint">Costo {clp(costo)}</span>
+                              {(idea.precioEstimado ?? 0) > 0 && (
+                                <span className={`font-semibold ${margenPct < 0 ? 'text-accent' : 'text-ink'}`}>
+                                  Margen {num(margenPct * 100)}%
+                                </span>
+                              )}
+                            </div>
+                          )
+                        })()}
                         {idea.productoCreado && (
                           <p className="mt-2 flex items-center gap-1 text-xs font-semibold text-secondary">
                             <CheckCircle2 size={12} /> En inventario
@@ -95,29 +111,46 @@ export function PlanningPage() {
 }
 
 function IdeaForm({ idea, onClose }: { idea: ProjectIdea | null; onClose: () => void }) {
-  const [f, setF] = useState(
-    idea ?? {
-      titulo: '',
-      descripcion: '',
-      stage: 'idea' as IdeaStage,
-      prioridad: 'media' as Prioridad,
-      notas: '',
-    },
-  )
+  const materials = useDb((d) => d.materials)
+  const [f, setF] = useState(() => ({
+    titulo: idea?.titulo ?? '',
+    descripcion: idea?.descripcion ?? '',
+    stage: (idea?.stage ?? 'idea') as IdeaStage,
+    prioridad: (idea?.prioridad ?? 'media') as Prioridad,
+    notas: idea?.notas ?? '',
+    bom: (idea?.bom ?? []) as BomItem[],
+    precioEstimado: idea?.precioEstimado ?? 0,
+  }))
+  const [margenObjetivo, setMargenObjetivo] = useState(60)
   const set = (k: string, v: unknown) => setF((s) => ({ ...s, [k]: v }))
 
+  // Costo y margen estimados en vivo (mismo marco que la ficha de producto).
+  const costo = costoProducto(materials, f.bom)
+  const { margenMonto, margenPct } = margenProducto(materials, f.bom, f.precioEstimado)
+  const sugerido = precioSugerido(costo, margenObjetivo)
+
   const guardar = () => {
+    const campos = {
+      titulo: f.titulo,
+      descripcion: f.descripcion,
+      prioridad: f.prioridad,
+      notas: f.notas,
+      bom: f.bom,
+      precioEstimado: f.precioEstimado,
+    }
     if (idea) {
-      if (f.stage !== idea.stage) moverIdea(idea.id, f.stage) // registra conversion a inventario
-      updateIdea(idea.id, { titulo: f.titulo, descripcion: f.descripcion, prioridad: f.prioridad, notas: f.notas })
+      // Actualiza primero (para que la conversion a producto use la receta fresca),
+      // luego mueve de etapa si cambio.
+      updateIdea(idea.id, campos)
+      if (f.stage !== idea.stage) moverIdea(idea.id, f.stage)
     } else {
-      addIdea({ titulo: f.titulo, descripcion: f.descripcion, stage: f.stage, prioridad: f.prioridad, notas: f.notas })
+      addIdea({ ...campos, stage: f.stage })
     }
     onClose()
   }
 
   return (
-    <Modal open onClose={onClose} title={idea ? 'Editar idea' : 'Nueva idea'}>
+    <Modal open onClose={onClose} title={idea ? 'Editar idea' : 'Nueva idea'} wide>
       <div className="space-y-4">
         <Field label="Titulo">
           <input className="input" value={f.titulo} onChange={(e) => set('titulo', e.target.value)} />
@@ -125,7 +158,7 @@ function IdeaForm({ idea, onClose }: { idea: ProjectIdea | null; onClose: () => 
         <Field label="Descripcion">
           <textarea className="input" rows={2} value={f.descripcion} onChange={(e) => set('descripcion', e.target.value)} />
         </Field>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           <Field label="Etapa">
             <select className="input" value={f.stage} onChange={(e) => set('stage', e.target.value)}>
               {IDEA_STAGES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
@@ -138,13 +171,63 @@ function IdeaForm({ idea, onClose }: { idea: ProjectIdea | null; onClose: () => 
               <option value="baja">Baja</option>
             </select>
           </Field>
+          <Field label="Precio estimado (CLP)">
+            <input type="number" className="input" value={f.precioEstimado} onChange={(e) => set('precioEstimado', Number(e.target.value))} />
+          </Field>
         </div>
+
+        {/* Receta de insumos necesarios (para estimar costo) */}
+        <div>
+          <p className="label">Insumos necesarios (receta)</p>
+          <BomEditor materials={materials} bom={f.bom} onChange={(bom) => set('bom', bom)} />
+        </div>
+
+        {idea?.productoCreado && (
+          <p className="rounded-lg bg-surface-muted px-3 py-2 text-xs text-ink-soft">
+            Esta idea ya esta en Inventario. Editar aqui su receta o precio NO modifica el producto ya creado.
+          </p>
+        )}
+
+        {/* Costo, margen y precio sugerido */}
+        <div className="rounded-lg bg-surface-muted p-4">
+          <div className="grid grid-cols-3 gap-3 text-center">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink-faint">Costo insumos</p>
+              <p className="text-lg font-extrabold text-ink">{clp(costo)}</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink-faint">Margen</p>
+              <p className={`text-lg font-extrabold ${margenMonto < 0 ? 'text-accent' : 'text-ink'}`}>{clp(margenMonto)}</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink-faint">Margen %</p>
+              <p className={`text-lg font-extrabold ${margenPct < 0 ? 'text-accent' : 'text-ink'}`}>
+                {f.precioEstimado > 0 ? `${num(margenPct * 100)}%` : '-'}
+              </p>
+            </div>
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-surface-border pt-3">
+            <span className="text-sm text-ink-soft">Precio para margen</span>
+            <input
+              type="number"
+              className="input w-20"
+              value={margenObjetivo}
+              onChange={(e) => setMargenObjetivo(Number(e.target.value))}
+            />
+            <span className="text-sm text-ink-soft">% =</span>
+            <b className="text-ink">{clp(sugerido)}</b>
+            <button type="button" className="btn-outline !py-1.5 text-xs" disabled={sugerido <= 0} onClick={() => set('precioEstimado', sugerido)}>
+              Aplicar como precio
+            </button>
+          </div>
+        </div>
+
         <Field label="Notas">
           <textarea className="input" rows={2} value={f.notas} onChange={(e) => set('notas', e.target.value)} />
         </Field>
         {f.stage === 'listo' && !idea?.productoCreado && (
           <p className="rounded-lg bg-secondary-50 px-3 py-2 text-xs text-ink">
-            Al guardar en etapa "Listo" se creara automaticamente un producto en Inventario.
+            Al guardar en etapa "Listo" se creara un producto en Inventario con esta receta y precio.
           </p>
         )}
       </div>
