@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { Plus, Clock, TrendingUp, Wallet } from 'lucide-react'
+import { Plus, Clock, TrendingUp, Wallet, ChevronRight } from 'lucide-react'
 import { useDb } from '@/lib/store'
 import type { Order } from '@/lib/types'
-import { SectionTitle, StatTile, Modal, Field, Badge } from '@/components/ui'
+import { SectionTitle, StatTile, Modal, Field, Badge, Card } from '@/components/ui'
 import { clp, num, fechaCorta, diasHasta } from '@/lib/format'
 import {
   stagesOrdenadas,
@@ -23,6 +23,11 @@ export function FunnelPage() {
   const cycle = cycleTime(db)
   const [editing, setEditing] = useState<Order | null>(null)
   const [creating, setCreating] = useState(false)
+  const [expanded, setExpanded] = useState<string | null>(null)
+
+  const maxCount = Math.max(1, ...stages.map((s) => ordersPorEtapa(db, s.id).length))
+  const totalQ = db.orders.length
+  const totalMonto = db.orders.reduce((s, o) => s + o.monto, 0)
 
   return (
     <div className="space-y-6">
@@ -39,60 +44,87 @@ export function FunnelPage() {
         <StatTile label="Conversion" value={`${num(tasaConversion(db) * 100)}%`} hint="Entregados / total" icon={<TrendingUp size={20} />} tone="accent" />
       </div>
 
-      {/* Kanban */}
-      <div className="flex gap-4 overflow-x-auto pb-4">
-        {stages.map((s) => {
-          const orders = ordersPorEtapa(db, s.id)
-          const valor = orders.reduce((sum, o) => sum + o.monto, 0)
-          return (
-            <div key={s.id} className="flex w-72 shrink-0 flex-col">
-              <div className="mb-2 flex items-center justify-between px-1">
-                <div className="flex items-center gap-2">
-                  <span className={`h-2 w-2 rounded-full ${s.esGanada ? 'bg-secondary' : 'bg-primary'}`} />
-                  <span className="text-sm font-bold text-ink">{s.nombre}</span>
-                  <Badge tone="neutral">{orders.length}</Badge>
-                </div>
-              </div>
-              <p className="mb-2 px-1 text-xs text-ink-faint">{clp(valor)}</p>
-              <div className="flex flex-1 flex-col gap-2 rounded-xl bg-surface-muted p-2">
-                {orders.length === 0 && (
-                  <p className="px-2 py-4 text-center text-xs text-ink-faint">Sin pedidos</p>
+      {/* Embudo compacto: Q (cantidad) y $ (monto) por etapa */}
+      <Card className="!p-4">
+        <div className="mb-1 flex items-center gap-3 px-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">
+          <span className="w-4 shrink-0" />
+          <span className="w-24 shrink-0 sm:w-28">Etapa</span>
+          <span className="hidden flex-1 sm:block" />
+          <span className="w-10 shrink-0 text-right">Q</span>
+          <span className="w-24 shrink-0 text-right sm:w-28">$</span>
+        </div>
+
+        <div className="space-y-0.5">
+          {stages.map((s) => {
+            const orders = ordersPorEtapa(db, s.id)
+            const valor = orders.reduce((sum, o) => sum + o.monto, 0)
+            const pct = (orders.length / maxCount) * 100
+            const isOpen = expanded === s.id
+            return (
+              <div key={s.id}>
+                <button
+                  onClick={() => setExpanded(isOpen ? null : s.id)}
+                  className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-surface-muted"
+                >
+                  <ChevronRight size={16} className={`shrink-0 text-ink-faint transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+                  <span className="w-24 shrink-0 truncate text-sm font-semibold text-ink sm:w-28">{s.nombre}</span>
+                  <span className="hidden h-6 flex-1 overflow-hidden rounded-md bg-surface-muted sm:block">
+                    <span
+                      className={`block h-full rounded-md ${s.esGanada ? 'bg-secondary' : 'bg-primary'}`}
+                      style={{ width: `${orders.length ? Math.max(pct, 8) : 0}%` }}
+                    />
+                  </span>
+                  <span className="w-10 shrink-0 text-right text-sm font-bold text-ink">{orders.length}</span>
+                  <span className="w-24 shrink-0 text-right text-sm font-bold text-ink sm:w-28">{clp(valor)}</span>
+                </button>
+
+                {isOpen && (
+                  <div className="mb-1 ml-7 mt-0.5 space-y-0.5 border-l border-surface-border pl-3">
+                    {orders.length === 0 ? (
+                      <p className="px-2 py-1.5 text-xs text-ink-faint">Sin pedidos en esta etapa</p>
+                    ) : (
+                      orders.map((o) => {
+                        const cliente = db.customers.find((c) => c.id === o.customerId)?.nombre ?? 'Cliente'
+                        const dias = diasHasta(o.fechaComprometida)
+                        const alerta = o.fechaComprometida && !o.entregadoAt && dias !== null && dias <= 2
+                        return (
+                          <button
+                            key={o.id}
+                            onClick={() => setEditing(o)}
+                            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-surface-muted"
+                          >
+                            <span className="flex-1 truncate text-sm text-ink">
+                              {o.titulo} <span className="text-xs text-ink-faint">- {cliente}</span>
+                            </span>
+                            {o.fechaComprometida && (
+                              <Badge tone={alerta ? 'accent' : 'neutral'}>{fechaCorta(o.fechaComprometida)}</Badge>
+                            )}
+                            <span className="w-24 text-right text-sm font-semibold text-ink">{clp(o.monto)}</span>
+                          </button>
+                        )
+                      })
+                    )}
+                  </div>
                 )}
-                {orders.map((o) => (
-                  <OrderCard key={o.id} order={o} onClick={() => setEditing(o)} />
-                ))}
               </div>
-            </div>
-          )
-        })}
-      </div>
+            )
+          })}
+        </div>
+
+        {/* Totales */}
+        <div className="mt-1 flex items-center gap-3 border-t border-surface-border px-2 pt-2">
+          <span className="w-4 shrink-0" />
+          <span className="w-24 shrink-0 text-sm font-bold text-ink sm:w-28">Total</span>
+          <span className="hidden flex-1 sm:block" />
+          <span className="w-10 shrink-0 text-right text-sm font-extrabold text-ink">{totalQ}</span>
+          <span className="w-24 shrink-0 text-right text-sm font-extrabold text-ink sm:w-28">{clp(totalMonto)}</span>
+        </div>
+      </Card>
 
       {(creating || editing) && (
         <OrderForm order={editing} onClose={() => { setCreating(false); setEditing(null) }} />
       )}
     </div>
-  )
-}
-
-function OrderCard({ order, onClick }: { order: Order; onClick: () => void }) {
-  const db = useDb((d) => d)
-  const cliente = db.customers.find((c) => c.id === order.customerId)?.nombre ?? 'Cliente'
-  const dias = diasHasta(order.fechaComprometida)
-  const alerta = order.fechaComprometida && !order.entregadoAt && dias !== null && dias <= 2
-
-  return (
-    <button onClick={onClick} className="card w-full p-3 text-left hover:border-primary">
-      <p className="text-sm font-semibold text-ink">{order.titulo}</p>
-      <p className="text-xs text-ink-faint">{cliente}</p>
-      <div className="mt-2 flex items-center justify-between">
-        <span className="text-sm font-bold text-ink">{clp(order.monto)}</span>
-        {order.fechaComprometida && (
-          <Badge tone={alerta ? 'accent' : 'neutral'}>
-            {fechaCorta(order.fechaComprometida)}
-          </Badge>
-        )}
-      </div>
-    </button>
   )
 }
 
