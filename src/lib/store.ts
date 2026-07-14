@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import type { Database } from './types'
-import { buildSeed } from './seed'
+import { buildSeed, buildSeedMinimal } from './seed'
 import { supabase, isCloud } from './supabase'
 
 // -------------------------------------------------------------------------
@@ -180,8 +180,9 @@ export async function initCloud(userId: string): Promise<void> {
   }
 
   if (total === 0) {
-    // Cuenta nueva: sembrar demo y empujarla a la nube.
-    const seed = buildSeed()
+    // Cuenta nueva en la nube (productivo): sembrar solo las etapas del funnel,
+    // sin datos de ejemplo, y empujarlas a la nube.
+    const seed = buildSeedMinimal()
     state = seed
     emit()
     await syncDiff(emptyDb(), seed)

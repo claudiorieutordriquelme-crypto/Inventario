@@ -1,4 +1,4 @@
-import type { Database } from './types'
+import type { Database, Stage } from './types'
 
 // Datos de ejemplo para que la app arranque con contenido demostrable.
 // Se cargan solo la primera vez; luego persiste lo que el usuario edite.
@@ -6,8 +6,10 @@ const now = new Date()
 const iso = (offsetDays: number) =>
   new Date(now.getTime() + offsetDays * 86400000).toISOString()
 
-export function buildSeed(): Database {
-  const stages = [
+// Etapas por defecto del funnel. Son configuracion necesaria para operar, no
+// datos de ejemplo, por lo que se siembran incluso en cuentas productivas.
+function defaultStages(): Stage[] {
+  return [
     { id: 'st-lead', nombre: 'Lead', orden: 0, esGanada: false },
     { id: 'st-cotiz', nombre: 'Cotizacion', orden: 1, esGanada: false },
     { id: 'st-conf', nombre: 'Confirmado', orden: 2, esGanada: false },
@@ -16,6 +18,23 @@ export function buildSeed(): Database {
     { id: 'st-entrega', nombre: 'Entregado', orden: 5, esGanada: true },
     { id: 'st-post', nombre: 'Postventa', orden: 6, esGanada: false },
   ]
+}
+
+function emptyDb(): Database {
+  return {
+    materials: [], products: [], movements: [], customers: [],
+    stages: [], orders: [], designs: [], posts: [], ideas: [],
+  }
+}
+
+// Semilla minima para cuentas productivas: solo las etapas del funnel, sin
+// datos de ejemplo. La UI arranca lista para operar pero vacia.
+export function buildSeedMinimal(): Database {
+  return { ...emptyDb(), stages: defaultStages() }
+}
+
+export function buildSeed(): Database {
+  const stages = defaultStages()
 
   const materials = [
     {
