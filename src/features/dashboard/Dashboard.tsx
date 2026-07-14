@@ -4,7 +4,7 @@ import { useDb } from '@/lib/store'
 import { Card, StatTile, SectionTitle, Badge } from '@/components/ui'
 import { clp, num, fechaCorta, diasHasta } from '@/lib/format'
 import { valorInventario, materialesEnAlerta } from '@/lib/inventory'
-import { cycleTime, tasaConversion, pipelineValor, stagesOrdenadas, ordersPorEtapa } from '@/lib/funnel'
+import { cycleTime, tasaConversion, pipelineValor, stagesOrdenadas, ordersPorEtapa, ventasPorMes } from '@/lib/funnel'
 import { entregasPendientes } from '@/lib/notifications'
 
 export function Dashboard() {
@@ -16,6 +16,9 @@ export function Dashboard() {
     .sort((a, b) => (a.fechaComprometida! < b.fechaComprometida! ? -1 : 1))
   const stages = stagesOrdenadas(db)
   const maxEnEtapa = Math.max(1, ...stages.map((s) => ordersPorEtapa(db, s.id).length))
+  const ventas = ventasPorMes(db, 6)
+  const maxVenta = Math.max(1, ...ventas.map((v) => v.total))
+  const totalVentas = ventas.reduce((s, v) => s + v.total, 0)
 
   return (
     <div className="space-y-6">
@@ -54,6 +57,38 @@ export function Dashboard() {
           tone="accent"
         />
       </div>
+
+      {/* Ventas por mes */}
+      <Card>
+        <div className="mb-4 flex items-end justify-between">
+          <div>
+            <h3 className="font-bold text-ink">Ventas por mes</h3>
+            <p className="text-xs text-ink-faint">Ultimos 6 meses - pedidos entregados</p>
+          </div>
+          <div className="text-right">
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink-faint">Total periodo</p>
+            <p className="text-xl font-extrabold text-ink">{clp(totalVentas)}</p>
+          </div>
+        </div>
+        <div className="flex h-48 items-end gap-3">
+          {ventas.map((v) => {
+            const h = (v.total / maxVenta) * 100
+            return (
+              <div key={v.key} className="flex flex-1 flex-col items-center gap-2">
+                <div className="flex w-full flex-1 items-end">
+                  <div
+                    className="w-full rounded-t-md bg-primary transition-all hover:bg-primary-700"
+                    style={{ height: `${v.total > 0 ? Math.max(h, 3) : 0}%` }}
+                    title={`${clp(v.total)} - ${v.cantidad} venta(s)`}
+                  />
+                </div>
+                <span className="text-xs font-semibold text-ink">{clp(v.total)}</span>
+                <span className="text-xs capitalize text-ink-faint">{v.label}</span>
+              </div>
+            )
+          })}
+        </div>
+      </Card>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Funnel visual */}

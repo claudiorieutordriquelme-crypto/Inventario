@@ -88,11 +88,15 @@ export function setState(producer: (draft: Database) => Database) {
 }
 
 export function useDb<T>(selector: (db: Database) => T): T {
-  return useSyncExternalStore(
+  // El snapshot es el `state` (referencia estable, solo cambia al mutar). El
+  // selector se aplica afuera para no crear un valor nuevo en cada llamada de
+  // getSnapshot, lo que provocaria un loop infinito en useSyncExternalStore.
+  const db = useSyncExternalStore(
     subscribe,
-    () => selector(state),
-    () => selector(state),
+    () => state,
+    () => state,
   )
+  return selector(db)
 }
 
 export function resetDb() {

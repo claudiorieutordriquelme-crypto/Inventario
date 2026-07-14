@@ -14,6 +14,7 @@ import {
   addOrder,
   updateOrder,
   deleteOrder,
+  montoDeProductos,
 } from '@/lib/funnel'
 
 export function FunnelPage() {
@@ -113,19 +114,30 @@ function OrderForm({ order, onClose }: { order: Order | null; onClose: () => voi
   )
   const set = (k: string, v: unknown) => setF((s) => ({ ...s, [k]: v }))
 
+  // Agrega/actualiza la cantidad de un producto y recalcula el monto sugerido.
+  const setProducto = (productId: string, cantidad: number) => {
+    setF((s) => {
+      const rest = s.productos.filter((l) => l.productId !== productId)
+      const productos = cantidad > 0 ? [...rest, { productId, cantidad }] : rest
+      return { ...s, productos, monto: montoDeProductos(db, productos) }
+    })
+  }
+  const cantidadDe = (productId: string): number =>
+    f.productos.find((l) => l.productId === productId)?.cantidad ?? 0
+
   const guardar = () => {
     const fechaIso = f.fechaComprometida ? new Date(f.fechaComprometida).toISOString() : null
     if (order) {
-      // si cambio la etapa, usar moverEtapa para registrar historial
+      // si cambio la etapa, usar moverEtapa para registrar historial y rebaja
       if (f.stageId !== order.stageId) moverEtapa(order.id, f.stageId)
       updateOrder(order.id, {
         customerId: f.customerId, titulo: f.titulo, monto: f.monto,
-        fechaComprometida: fechaIso, notas: f.notas,
+        productos: f.productos, fechaComprometida: fechaIso, notas: f.notas,
       })
     } else {
       addOrder({
         customerId: f.customerId, titulo: f.titulo, stageId: f.stageId, monto: f.monto,
-        productos: [], fechaComprometida: fechaIso, notas: f.notas,
+        productos: f.productos, fechaComprometida: fechaIso, notas: f.notas,
       })
     }
     onClose()
@@ -156,6 +168,34 @@ function OrderForm({ order, onClose }: { order: Order | null; onClose: () => voi
         <Field label="Fecha comprometida">
           <input type="date" className="input" value={f.fechaComprometida} onChange={(e) => set('fechaComprometida', e.target.value)} />
         </Field>
+
+        <div className="col-span-2">
+          <p className="label">Productos del pedido</p>
+          <p className="-mt-0.5 mb-2 text-xs text-ink-faint">
+            Al mover el pedido a "{stages.find((s) => s.esGanada)?.nombre ?? 'Entregado'}" se rebaja el stock automaticamente.
+          </p>
+          {db.products.length === 0 ? (
+            <p className="text-sm text-ink-faint">Primero crea productos en Inventario.</p>
+          ) : (
+            <div className="max-h-44 space-y-2 overflow-y-auto rounded-lg border border-surface-border p-3">
+              {db.products.map((p) => (
+                <div key={p.id} className="flex items-center gap-3">
+                  <span className="flex-1 text-sm text-ink-soft">
+                    {p.nombre} <span className="text-xs text-ink-faint">- {clp(p.precio)} (stock {p.stock})</span>
+                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    className="input w-24"
+                    value={cantidadDe(p.id)}
+                    onChange={(e) => setProducto(p.id, Number(e.target.value))}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="col-span-2">
           <Field label="Notas">
             <textarea className="input" rows={2} value={f.notas} onChange={(e) => set('notas', e.target.value)} />

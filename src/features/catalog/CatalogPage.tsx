@@ -1,124 +1,246 @@
-import { useState } from 'react'
-import { Plus, Share2, Trash2, Image as ImageIcon, MessageCircle, Music2, Instagram, Copy } from 'lucide-react'
-import { useDb, setState, uid, nowIso } from '@/lib/store'
-import type { CatalogDesign } from '@/lib/types'
+import { useMemo, useRef, useState } from 'react'
+import {
+  Search,
+  Share2,
+  ImagePlus,
+  Eye,
+  EyeOff,
+  MessageCircle,
+  Music2,
+  Instagram,
+  Copy,
+  Link as LinkIcon,
+  Package,
+} from 'lucide-react'
+import { useDb } from '@/lib/store'
+import type { Product, ProductType } from '@/lib/types'
+import { updateProduct } from '@/lib/inventory'
 import { SectionTitle, Card, Badge, Modal, Field, EmptyState } from '@/components/ui'
+import { clp } from '@/lib/format'
+import { compressImage } from '@/lib/image'
 import { compartir, linkWhatsApp, INSTAGRAM_URL, TIKTOK_URL } from '@/lib/share'
 
-function addDesign(d: Omit<CatalogDesign, 'id' | 'createdAt'>) {
-  setState((db) => ({ ...db, designs: [...db.designs, { ...d, id: uid('des'), createdAt: nowIso() }] }))
-}
-function deleteDesign(id: string) {
-  setState((db) => ({ ...db, designs: db.designs.filter((x) => x.id !== id) }))
+type Filtro = 'todos' | ProductType
+
+// Gradiente de portada segun tipo, para verse como catalogo aunque no haya foto.
+const gradientes: Record<ProductType, string> = {
+  crochet: 'from-primary to-primary-900',
+  estampado: 'from-accent to-primary',
+  otro: 'from-secondary to-primary',
 }
 
 export function CatalogPage() {
-  const db = useDb((d) => d)
-  const [creating, setCreating] = useState(false)
-  const [sharing, setSharing] = useState<CatalogDesign | null>(null)
+  const products = useDb((db) => db.products)
+  const [search, setSearch] = useState('')
+  const [filtro, setFiltro] = useState<Filtro>('todos')
+  const [soloPublicos, setSoloPublicos] = useState(false)
+  const [sharing, setSharing] = useState<Product | null>(null)
+  const [editImg, setEditImg] = useState<Product | null>(null)
 
-  // Productos marcados como publicos tambien forman parte del catalogo.
-  const productosPublicos = db.products.filter((p) => p.catalogoPublico)
+  const visibles = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return products.filter((p) => {
+      if (filtro !== 'todos' && p.tipo !== filtro) return false
+      if (soloPublicos && !p.catalogoPublico) return false
+      if (q && !p.nombre.toLowerCase().includes(q) && !p.sku.toLowerCase().includes(q)) return false
+      return true
+    })
+  }, [products, search, filtro, soloPublicos])
+
+  const filtros: { id: Filtro; label: string }[] = [
+    { id: 'todos', label: 'Todos' },
+    { id: 'crochet', label: 'Crochet' },
+    { id: 'estampado', label: 'Estampado' },
+    { id: 'otro', label: 'Otros' },
+  ]
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <SectionTitle title="Catalogo de disenos" sub="Disenos listos para compartir en redes sociales" />
-        <button className="btn-primary" onClick={() => setCreating(true)}>
-          <Plus size={16} /> Nuevo diseno
-        </button>
-      </div>
+      <SectionTitle title="Catalogo" sub="Vitrina de productos para compartir en redes sociales" />
 
-      {productosPublicos.length > 0 && (
-        <div>
-          <p className="mb-2 text-sm font-semibold text-ink-soft">Productos publicados</p>
-          <div className="flex flex-wrap gap-2">
-            {productosPublicos.map((p) => (
-              <Badge key={p.id} tone="secondary">{p.nombre}</Badge>
+      {/* Barra de filtros */}
+      <Card className="!p-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+          <div className="relative flex-1">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-faint" />
+            <input
+              className="input pl-9"
+              placeholder="Buscar por nombre o SKU..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {filtros.map((f) => (
+              <button
+                key={f.id}
+                onClick={() => setFiltro(f.id)}
+                className={`rounded-full px-3 py-1.5 text-sm font-semibold transition-colors ${
+                  filtro === f.id ? 'bg-primary text-white' : 'bg-surface-muted text-ink-soft hover:bg-primary-50'
+                }`}
+              >
+                {f.label}
+              </button>
             ))}
           </div>
+          <label className="flex items-center gap-2 whitespace-nowrap text-sm text-ink-soft">
+            <input type="checkbox" checked={soloPublicos} onChange={(e) => setSoloPublicos(e.target.checked)} />
+            Solo publicados
+          </label>
         </div>
-      )}
+      </Card>
 
-      {db.designs.length === 0 ? (
-        <EmptyState title="Sin disenos en catalogo" hint="Crea un diseno con foto y texto para compartir." />
+      {visibles.length === 0 ? (
+        <EmptyState
+          title="Sin productos para mostrar"
+          hint="Crea productos en Inventario o ajusta los filtros. Agrega fotos para armar tu vitrina."
+        />
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {db.designs.map((d) => (
-            <Card key={d.id} className="flex flex-col !p-0 overflow-hidden">
-              <div className="flex h-40 items-center justify-center bg-surface-muted">
-                {d.imagenUrl ? (
-                  <img src={d.imagenUrl} alt={d.titulo} className="h-full w-full object-cover" />
-                ) : (
-                  <ImageIcon size={40} className="text-ink-faint" />
-                )}
-              </div>
-              <div className="flex flex-1 flex-col p-4">
-                <p className="font-bold text-ink">{d.titulo}</p>
-                <p className="mt-1 flex-1 text-sm text-ink-faint">{d.descripcion}</p>
-                <div className="mt-2 flex flex-wrap gap-1">
-                  {d.tags.map((t) => <Badge key={t} tone="neutral">#{t}</Badge>)}
-                </div>
-                <div className="mt-3 flex gap-2 border-t border-surface-border pt-3">
-                  <button className="btn-primary flex-1 !py-1.5 text-xs" onClick={() => setSharing(d)}>
-                    <Share2 size={14} /> Compartir
-                  </button>
-                  <button className="btn-ghost !p-1.5 text-accent" onClick={() => { if (confirm('Eliminar diseno?')) deleteDesign(d.id) }}>
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              </div>
-            </Card>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
+          {visibles.map((p) => (
+            <ProductoCard
+              key={p.id}
+              product={p}
+              onShare={() => setSharing(p)}
+              onImage={() => setEditImg(p)}
+            />
           ))}
         </div>
       )}
 
-      {creating && <DesignForm onClose={() => setCreating(false)} onSave={(d) => { addDesign(d); setCreating(false) }} />}
-      {sharing && <ShareModal design={sharing} onClose={() => setSharing(null)} />}
+      {sharing && <ShareModal product={sharing} onClose={() => setSharing(null)} />}
+      {editImg && <ImageModal product={editImg} onClose={() => setEditImg(null)} />}
     </div>
   )
 }
 
-function DesignForm({
-  onClose,
-  onSave,
+function ProductoCard({
+  product: p,
+  onShare,
+  onImage,
 }: {
-  onClose: () => void
-  onSave: (d: Omit<CatalogDesign, 'id' | 'createdAt'>) => void
+  product: Product
+  onShare: () => void
+  onImage: () => void
 }) {
-  const [f, setF] = useState({ titulo: '', descripcion: '', tags: '', imagenUrl: '', textoCompartir: '' })
-  const set = (k: keyof typeof f, v: string) => setF((s) => ({ ...s, [k]: v }))
+  return (
+    <div className="group card flex flex-col overflow-hidden !p-0">
+      {/* Portada */}
+      <div className="relative aspect-[4/5] overflow-hidden">
+        {p.fotoUrl ? (
+          <img
+            src={p.fotoUrl}
+            alt={p.nombre}
+            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+          />
+        ) : (
+          <div className={`flex h-full w-full items-center justify-center bg-gradient-to-br ${gradientes[p.tipo]}`}>
+            <span className="px-3 text-center text-lg font-extrabold text-white/90">{p.nombre}</span>
+          </div>
+        )}
+        {/* Precio */}
+        <div className="absolute bottom-2 left-2 rounded-lg bg-surface/95 px-2.5 py-1 text-sm font-extrabold text-ink shadow-card">
+          {clp(p.precio)}
+        </div>
+        {/* Estado publico */}
+        <div className="absolute right-2 top-2">
+          <button
+            onClick={() => updateProduct(p.id, { catalogoPublico: !p.catalogoPublico })}
+            title={p.catalogoPublico ? 'Publicado (click para ocultar)' : 'Oculto (click para publicar)'}
+            className={`flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold ${
+              p.catalogoPublico ? 'bg-secondary text-ink' : 'bg-ink/70 text-white'
+            }`}
+          >
+            {p.catalogoPublico ? <Eye size={12} /> : <EyeOff size={12} />}
+          </button>
+        </div>
+        {/* Boton imagen (aparece al hover) */}
+        <button
+          onClick={onImage}
+          className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-ink/70 px-2 py-1 text-xs font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100"
+          title="Cambiar imagen"
+        >
+          <ImagePlus size={12} /> Foto
+        </button>
+      </div>
+      {/* Info */}
+      <div className="flex flex-1 flex-col p-3">
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-sm font-bold leading-tight text-ink">{p.nombre}</p>
+          <Badge tone={p.tipo === 'estampado' ? 'accent' : 'primary'}>{p.tipo}</Badge>
+        </div>
+        <p className="mt-0.5 text-xs text-ink-faint">
+          {p.sku || 'sin SKU'} - stock {p.stock}
+        </p>
+        <button className="btn-primary mt-3 w-full !py-1.5 text-xs" onClick={onShare}>
+          <Share2 size={14} /> Compartir
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function ImageModal({ product, onClose }: { product: Product; onClose: () => void }) {
+  const [url, setUrl] = useState(product.fotoUrl)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const onFile = async (file: File) => {
+    setBusy(true)
+    setError('')
+    try {
+      const dataUrl = await compressImage(file)
+      setUrl(dataUrl)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error al procesar la imagen')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   return (
-    <Modal open onClose={onClose} title="Nuevo diseno">
-      <div className="space-y-4">
-        <Field label="Titulo">
-          <input className="input" value={f.titulo} onChange={(e) => set('titulo', e.target.value)} />
-        </Field>
-        <Field label="Descripcion">
-          <textarea className="input" rows={2} value={f.descripcion} onChange={(e) => set('descripcion', e.target.value)} />
-        </Field>
-        <Field label="Tags (separados por coma)">
-          <input className="input" value={f.tags} onChange={(e) => set('tags', e.target.value)} placeholder="crochet, regalo" />
-        </Field>
-        <Field label="URL de imagen (opcional)">
-          <input className="input" value={f.imagenUrl} onChange={(e) => set('imagenUrl', e.target.value)} placeholder="https://..." />
-        </Field>
-        <Field label="Texto para compartir">
-          <textarea className="input" rows={2} value={f.textoCompartir} onChange={(e) => set('textoCompartir', e.target.value)} placeholder="Mensaje que acompana la publicacion" />
-        </Field>
+    <Modal open onClose={onClose} title={`Imagen - ${product.nombre}`}>
+      <div className="mb-4 flex justify-center">
+        <div className="aspect-[4/5] w-40 overflow-hidden rounded-xl bg-surface-muted">
+          {url ? (
+            <img src={url} alt="preview" className="h-full w-full object-cover" />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-ink-faint">
+              <Package size={32} />
+            </div>
+          )}
+        </div>
       </div>
+
+      <div className="space-y-4">
+        <button className="btn-outline w-full" disabled={busy} onClick={() => fileRef.current?.click()}>
+          <ImagePlus size={16} /> {busy ? 'Procesando...' : 'Subir foto desde el equipo'}
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])}
+        />
+        <Field label="O pegar URL de imagen">
+          <div className="relative">
+            <LinkIcon size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-faint" />
+            <input className="input pl-9" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://..." />
+          </div>
+        </Field>
+        {error && <p className="text-sm font-medium text-accent">{error}</p>}
+      </div>
+
       <div className="mt-6 flex justify-end gap-2">
+        {url && (
+          <button className="btn-ghost text-accent" onClick={() => { updateProduct(product.id, { fotoUrl: '' }); onClose() }}>
+            Quitar imagen
+          </button>
+        )}
         <button className="btn-outline" onClick={onClose}>Cancelar</button>
-        <button
-          className="btn-primary"
-          disabled={!f.titulo.trim()}
-          onClick={() => onSave({
-            titulo: f.titulo, descripcion: f.descripcion, imagenUrl: f.imagenUrl,
-            textoCompartir: f.textoCompartir || f.titulo,
-            tags: f.tags.split(',').map((t) => t.trim()).filter(Boolean),
-          })}
-        >
+        <button className="btn-primary" onClick={() => { updateProduct(product.id, { fotoUrl: url }); onClose() }}>
           Guardar
         </button>
       </div>
@@ -126,12 +248,12 @@ function DesignForm({
   )
 }
 
-function ShareModal({ design, onClose }: { design: CatalogDesign; onClose: () => void }) {
+function ShareModal({ product, onClose }: { product: Product; onClose: () => void }) {
   const [msg, setMsg] = useState('')
-  const texto = design.textoCompartir || design.titulo
+  const texto = `${product.nombre} - ${clp(product.precio)}. Disponible por encargo, escribenos!`
 
   const nativo = async () => {
-    const r = await compartir({ titulo: design.titulo, texto })
+    const r = await compartir({ titulo: product.nombre, texto })
     setMsg(r === 'nativo' ? 'Compartido.' : r === 'copiado' ? 'Texto copiado al portapapeles.' : 'No se pudo compartir.')
   }
   const copiar = async () => {
@@ -140,7 +262,10 @@ function ShareModal({ design, onClose }: { design: CatalogDesign; onClose: () =>
   const abrir = (url: string) => window.open(url, '_blank')
 
   return (
-    <Modal open onClose={onClose} title={`Compartir: ${design.titulo}`}>
+    <Modal open onClose={onClose} title={`Compartir: ${product.nombre}`}>
+      {product.fotoUrl && (
+        <img src={product.fotoUrl} alt={product.nombre} className="mb-3 h-40 w-full rounded-lg object-cover" />
+      )}
       <div className="rounded-lg bg-surface-muted p-3 text-sm text-ink-soft">{texto}</div>
       <div className="mt-4 grid grid-cols-2 gap-2">
         <button className="btn-primary" onClick={nativo}><Share2 size={16} /> Compartir</button>
@@ -150,7 +275,7 @@ function ShareModal({ design, onClose }: { design: CatalogDesign; onClose: () =>
         <button className="btn-outline col-span-2" onClick={() => { copiar(); abrir(TIKTOK_URL) }}><Music2 size={16} /> TikTok</button>
       </div>
       <p className="mt-3 text-xs text-ink-faint">
-        Instagram y TikTok no permiten prellenar el texto por seguridad: se copia al portapapeles y se abre la app para que pegues y publiques.
+        Instagram y TikTok no permiten prellenar texto: se copia al portapapeles y se abre la app para pegar y publicar.
       </p>
       {msg && <p className="mt-2 text-sm font-semibold text-primary">{msg}</p>}
     </Modal>

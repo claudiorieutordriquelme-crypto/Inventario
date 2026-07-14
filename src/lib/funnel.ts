@@ -56,6 +56,45 @@ export function pipelineValor(db: Database): number {
     .reduce((s, o) => s + o.monto, 0)
 }
 
+export interface VentaMes {
+  key: string
+  label: string
+  total: number
+  cantidad: number
+}
+
+// Consolida ventas por mes usando pedidos entregados (entregadoAt).
+export function ventasPorMes(db: Database, meses = 6): VentaMes[] {
+  const now = new Date()
+  const buckets: VentaMes[] = []
+  for (let i = meses - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const label = new Intl.DateTimeFormat('es-CL', { month: 'short' }).format(d)
+    buckets.push({ key: `${d.getFullYear()}-${d.getMonth()}`, label, total: 0, cantidad: 0 })
+  }
+  for (const o of db.orders) {
+    if (!o.entregadoAt) continue
+    const d = new Date(o.entregadoAt)
+    const b = buckets.find((x) => x.key === `${d.getFullYear()}-${d.getMonth()}`)
+    if (b) {
+      b.total += o.monto
+      b.cantidad += 1
+    }
+  }
+  return buckets
+}
+
+// Calcula el monto de un pedido a partir de sus productos y precios actuales.
+export function montoDeProductos(
+  db: Database,
+  productos: Order['productos'],
+): number {
+  return productos.reduce((sum, line) => {
+    const p = db.products.find((x) => x.id === line.productId)
+    return sum + (p ? p.precio * line.cantidad : 0)
+  }, 0)
+}
+
 // --- Mutaciones ---
 
 export function addCustomer(input: Omit<Customer, 'id' | 'createdAt'>) {
@@ -112,23 +151,49 @@ export function deleteOrder(id: string) {
   setState((db) => ({ ...db, orders: db.orders.filter((o) => o.id !== id) }))
 }
 
-// Mueve un pedido a otra etapa: registra en historial y setea entregadoAt
-// cuando entra a una etapa ganada.
+// Mueve un pedido a otra etapa. Al entrar por primera vez a la etapa ganada:
+// setea entregadoAt Y rebaja el inventario de los productos vendidos (relacion
+// lead -> producto -> inventario), dejando el movimiento en el kardex.
 export function moverEtapa(orderId: string, stageId: string) {
   setState((db) => {
     const esGanada = db.stages.find((s) => s.id === stageId)?.esGanada ?? false
+    const order = db.orders.find((o) => o.id === orderId)
+    if (!order || order.stageId === stageId) return db
+
+    const at = nowIso()
+    const primeraVenta = esGanada && !order.entregadoAt && order.productos.length > 0
+
+    let products = db.products
+    let movements = db.movements
+    if (primeraVenta) {
+      const movs: Database['movements'] = []
+      products = db.products.map((p) => {
+        const line = order.productos.find((l) => l.productId === p.id)
+        if (!line) return p
+        movs.push({
+          id: uid('mov'), fecha: at, tipo: 'venta', itemKind: 'product',
+          itemId: p.id, cantidad: -line.cantidad,
+          motivo: `Venta pedido: ${order.titulo}`, usuario: 'admin',
+        })
+        return { ...p, stock: Math.max(0, p.stock - line.cantidad) }
+      })
+      movements = [...movs, ...db.movements]
+    }
+
     return {
       ...db,
-      orders: db.orders.map((o) => {
-        if (o.id !== orderId || o.stageId === stageId) return o
-        const at = nowIso()
-        return {
-          ...o,
-          stageId,
-          entregadoAt: esGanada ? o.entregadoAt ?? at : o.entregadoAt,
-          historial: [...o.historial, { stageId, at }],
-        }
-      }),
+      products,
+      movements,
+      orders: db.orders.map((o) =>
+        o.id !== orderId
+          ? o
+          : {
+              ...o,
+              stageId,
+              entregadoAt: esGanada ? o.entregadoAt ?? at : o.entregadoAt,
+              historial: [...o.historial, { stageId, at }],
+            },
+      ),
     }
   })
 }
