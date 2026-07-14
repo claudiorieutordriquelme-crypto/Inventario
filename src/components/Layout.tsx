@@ -11,6 +11,8 @@ import {
   Menu,
   X,
   LogOut,
+  Lightbulb,
+  CalendarDays,
 } from 'lucide-react'
 import { useDb, clearCloudSession } from '@/lib/store'
 import { buildNotifications } from '@/lib/notifications'
@@ -21,7 +23,9 @@ import { useSession, signOut } from '@/lib/auth'
 const nav = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/inventario', label: 'Inventario', icon: Boxes },
+  { to: '/planning', label: 'Planning', icon: Lightbulb },
   { to: '/funnel', label: 'Funnel', icon: KanbanSquare },
+  { to: '/calendario', label: 'Calendario', icon: CalendarDays },
   { to: '/clientes', label: 'Clientes', icon: Users },
   { to: '/catalogo', label: 'Catalogo', icon: Images },
   { to: '/comunidad', label: 'Comunidad', icon: MessagesSquare },

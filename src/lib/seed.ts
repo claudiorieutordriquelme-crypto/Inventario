@@ -107,5 +107,11 @@ export function buildSeed(): Database {
     { id: 'post-2', autor: 'Camila R.', contenido: 'Termine mi primer amigurumi siguiendo el patron del catalogo.', imagenUrl: '', likes: 12, createdAt: iso(-1) },
   ]
 
-  return { materials, products, movements: [], customers, stages, orders, designs, posts }
+  const ideas = [
+    { id: 'idea-1', titulo: 'Coleccion navidad', descripcion: 'Amigurumis tematicos: reno, muneco de nieve', stage: 'idea' as const, prioridad: 'alta' as const, notas: 'Lanzar en noviembre', createdAt: iso(-4) },
+    { id: 'idea-2', titulo: 'Gorro con trenzas', descripcion: 'Nuevo patron de gorro', stage: 'diseno' as const, prioridad: 'media' as const, notas: '', createdAt: iso(-3) },
+    { id: 'idea-3', titulo: 'Tote bag estampada', descripcion: 'Bolsa de algodon con estampado propio', stage: 'prototipo' as const, prioridad: 'media' as const, notas: 'Probar tinta al agua', createdAt: iso(-2) },
+  ]
+
+  return { materials, products, movements: [], customers, stages, orders, designs, posts, ideas }
 }

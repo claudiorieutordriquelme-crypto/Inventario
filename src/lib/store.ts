@@ -27,12 +27,13 @@ const TABLES: (keyof Database)[] = [
   'orders',
   'designs',
   'posts',
+  'ideas',
 ]
 
 function emptyDb(): Database {
   return {
     materials: [], products: [], movements: [], customers: [],
-    stages: [], orders: [], designs: [], posts: [],
+    stages: [], orders: [], designs: [], posts: [], ideas: [],
   }
 }
 

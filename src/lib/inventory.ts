@@ -1,4 +1,4 @@
-import type { Database, Material, Product } from './types'
+import type { Database, Material, Product, BomItem } from './types'
 import { setState, uid, nowIso } from './store'
 
 // -------------------------------------------------------------------------
@@ -33,6 +33,35 @@ export function sugerirStockMinimo(
 ): number {
   const stockSeguridad = demandaDiaria * leadTimeDias * (factorSeguridad - 1)
   return Math.ceil(demandaDiaria * leadTimeDias + stockSeguridad)
+}
+
+// Costo de materiales de un producto segun su receta (BOM):
+// suma de (cantidad usada x costo unitario del material).
+export function costoProducto(materials: Material[], bom: BomItem[]): number {
+  return bom.reduce((s, b) => {
+    const m = materials.find((x) => x.id === b.materialId)
+    return s + (m ? m.costoUnitario * b.cantidad : 0)
+  }, 0)
+}
+
+export interface MargenInfo {
+  costo: number
+  margenMonto: number // precio - costo
+  margenPct: number // (precio - costo) / precio
+}
+
+export function margenProducto(materials: Material[], bom: BomItem[], precio: number): MargenInfo {
+  const costo = costoProducto(materials, bom)
+  const margenMonto = precio - costo
+  const margenPct = precio > 0 ? margenMonto / precio : 0
+  return { costo, margenMonto, margenPct }
+}
+
+// Precio sugerido para alcanzar un margen objetivo (%). Redondeado a $100.
+export function precioSugerido(costo: number, margenObjetivoPct: number): number {
+  const m = Math.min(Math.max(margenObjetivoPct, 0), 95) / 100
+  if (costo <= 0) return 0
+  return Math.round(costo / (1 - m) / 100) * 100
 }
 
 export function valorInventario(db: Database): number {

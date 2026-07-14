@@ -6,6 +6,8 @@ import { FunnelPage } from './features/funnel/FunnelPage'
 import { CustomersPage } from './features/funnel/CustomersPage'
 import { CatalogPage } from './features/catalog/CatalogPage'
 import { CommunityPage } from './features/community/CommunityPage'
+import { PlanningPage } from './features/planning/PlanningPage'
+import { CalendarPage } from './features/calendar/CalendarPage'
 
 export default function App() {
   return (
@@ -13,7 +15,9 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/inventario" element={<InventoryPage />} />
+        <Route path="/planning" element={<PlanningPage />} />
         <Route path="/funnel" element={<FunnelPage />} />
+        <Route path="/calendario" element={<CalendarPage />} />
         <Route path="/clientes" element={<CustomersPage />} />
         <Route path="/catalogo" element={<CatalogPage />} />
         <Route path="/comunidad" element={<CommunityPage />} />

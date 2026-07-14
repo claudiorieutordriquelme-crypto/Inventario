@@ -105,6 +105,21 @@ export interface CommunityPost {
   createdAt: string
 }
 
+// Planning tipo manufactura: ideas / productos en desarrollo por etapa.
+export type IdeaStage = 'idea' | 'diseno' | 'prototipo' | 'produccion' | 'listo'
+export type Prioridad = 'baja' | 'media' | 'alta'
+
+export interface ProjectIdea {
+  id: string
+  titulo: string
+  descripcion: string
+  stage: IdeaStage
+  prioridad: Prioridad
+  notas: string
+  productoCreado?: boolean // true cuando ya paso a Inventario como producto
+  createdAt: string
+}
+
 export interface Database {
   materials: Material[]
   products: Product[]
@@ -114,4 +129,5 @@ export interface Database {
   orders: Order[]
   designs: CatalogDesign[]
   posts: CommunityPost[]
+  ideas: ProjectIdea[]
 }

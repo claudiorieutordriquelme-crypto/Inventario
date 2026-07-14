@@ -3,8 +3,16 @@ import { Plus, Pencil, Trash2, Factory, Share2 } from 'lucide-react'
 import { useDb } from '@/lib/store'
 import type { Product, ProductType, BomItem } from '@/lib/types'
 import { Card, Badge, Modal, Field, EmptyState } from '@/components/ui'
-import { clp } from '@/lib/format'
-import { addProduct, updateProduct, deleteProduct, registrarProduccion } from '@/lib/inventory'
+import { clp, num } from '@/lib/format'
+import {
+  addProduct,
+  updateProduct,
+  deleteProduct,
+  registrarProduccion,
+  costoProducto,
+  margenProducto,
+  precioSugerido,
+} from '@/lib/inventory'
 
 const TIPOS: ProductType[] = ['crochet', 'estampado', 'otro']
 
@@ -15,6 +23,7 @@ const empty: Omit<Product, 'id' | 'createdAt'> = {
 
 export function ProductsTab() {
   const products = useDb((db) => db.products)
+  const materials = useDb((db) => db.materials)
   const [editing, setEditing] = useState<Product | null>(null)
   const [creating, setCreating] = useState(false)
   const [produce, setProduce] = useState<Product | null>(null)
@@ -31,7 +40,9 @@ export function ProductsTab() {
         <EmptyState title="Sin productos" hint="Crea un producto y define su receta de insumos (BOM)." />
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {products.map((p) => (
+          {products.map((p) => {
+            const { costo, margenPct } = margenProducto(materials, p.bom, p.precio)
+            return (
             <Card key={p.id} className="flex flex-col">
               <div className="mb-3 flex items-start justify-between">
                 <div>
@@ -51,6 +62,14 @@ export function ProductsTab() {
                   </Badge>
                 )}
               </div>
+              {costo > 0 && (
+                <div className="mt-2 flex items-center justify-between rounded-lg bg-surface-muted px-2.5 py-1.5 text-xs">
+                  <span className="text-ink-faint">Costo {clp(costo)}</span>
+                  <span className={`font-semibold ${margenPct < 0 ? 'text-accent' : 'text-ink'}`}>
+                    Margen {num(margenPct * 100)}%
+                  </span>
+                </div>
+              )}
               <div className="mt-3 flex items-center gap-2 border-t border-surface-border pt-3">
                 <button className="btn-outline flex-1 !py-1.5 text-xs" onClick={() => setProduce(p)}>
                   <Factory size={14} /> Producir
@@ -67,7 +86,8 @@ export function ProductsTab() {
                 </button>
               </div>
             </Card>
-          ))}
+            )
+          })}
         </div>
       )}
 
@@ -100,6 +120,7 @@ function ProductForm({
 }) {
   const materials = useDb((db) => db.materials)
   const [f, setF] = useState({ ...initial })
+  const [margenObjetivo, setMargenObjetivo] = useState(60)
   const set = (k: keyof typeof f, v: unknown) => setF((s) => ({ ...s, [k]: v }))
 
   const setBom = (materialId: string, cantidad: number) => {
@@ -109,6 +130,11 @@ function ProductForm({
     })
   }
   const bomFor = (id: string): number => f.bom.find((b) => b.materialId === id)?.cantidad ?? 0
+
+  // Costo y margen en vivo segun la receta y el precio actual.
+  const costo = costoProducto(materials, f.bom)
+  const { margenMonto, margenPct } = margenProducto(materials, f.bom, f.precio)
+  const sugerido = precioSugerido(costo, margenObjetivo)
 
   return (
     <Modal open onClose={onClose} title={'id' in initial ? 'Editar producto' : 'Nuevo producto'} wide>
@@ -149,25 +175,78 @@ function ProductForm({
       </div>
 
       <div className="mt-5">
-        <p className="label">Receta de insumos (BOM) - consumo por unidad producida</p>
+        <p className="label">Receta de insumos (BOM) - cantidad usada por unidad producida</p>
         {materials.length === 0 ? (
           <p className="text-sm text-ink-faint">Primero registra insumos en la pestana Insumos.</p>
         ) : (
-          <div className="max-h-48 space-y-2 overflow-y-auto rounded-lg border border-surface-border p-3">
-            {materials.map((m) => (
-              <div key={m.id} className="flex items-center gap-3">
-                <span className="flex-1 text-sm text-ink-soft">{m.nombre} <span className="text-xs text-ink-faint">({m.unidad})</span></span>
-                <input
-                  type="number"
-                  step="0.01"
-                  className="input w-28"
-                  value={bomFor(m.id)}
-                  onChange={(e) => setBom(m.id, Number(e.target.value))}
-                />
-              </div>
-            ))}
+          <div className="rounded-lg border border-surface-border">
+            <div className="flex items-center gap-3 border-b border-surface-border bg-surface-muted px-3 py-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">
+              <span className="flex-1">Insumo</span>
+              <span className="w-24 text-right">Cantidad</span>
+              <span className="w-24 text-right">Costo linea</span>
+            </div>
+            <div className="max-h-56 space-y-2 overflow-y-auto p-3">
+              {materials.map((m) => {
+                const cant = bomFor(m.id)
+                return (
+                  <div key={m.id} className="flex items-center gap-3">
+                    <span className="flex-1 text-sm text-ink-soft">
+                      {m.nombre}{' '}
+                      <span className="text-xs text-ink-faint">({m.unidad} - {clp(m.costoUnitario)}/{m.unidad})</span>
+                    </span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="input w-24"
+                      value={cant}
+                      onChange={(e) => setBom(m.id, Number(e.target.value))}
+                    />
+                    <span className="w-24 text-right text-sm text-ink">{cant > 0 ? clp(cant * m.costoUnitario) : '-'}</span>
+                  </div>
+                )
+              })}
+            </div>
           </div>
         )}
+      </div>
+
+      {/* Costo, margen y precio sugerido */}
+      <div className="mt-4 rounded-lg bg-surface-muted p-4">
+        <div className="grid grid-cols-3 gap-3 text-center">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink-faint">Costo insumos</p>
+            <p className="text-lg font-extrabold text-ink">{clp(costo)}</p>
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink-faint">Margen</p>
+            <p className={`text-lg font-extrabold ${margenMonto < 0 ? 'text-accent' : 'text-ink'}`}>{clp(margenMonto)}</p>
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink-faint">Margen %</p>
+            <p className={`text-lg font-extrabold ${margenPct < 0 ? 'text-accent' : 'text-ink'}`}>
+              {f.precio > 0 ? `${num(margenPct * 100)}%` : '-'}
+            </p>
+          </div>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-surface-border pt-3">
+          <span className="text-sm text-ink-soft">Precio para margen</span>
+          <input
+            type="number"
+            className="input w-20"
+            value={margenObjetivo}
+            onChange={(e) => setMargenObjetivo(Number(e.target.value))}
+          />
+          <span className="text-sm text-ink-soft">% =</span>
+          <b className="text-ink">{clp(sugerido)}</b>
+          <button
+            type="button"
+            className="btn-outline !py-1.5 text-xs"
+            disabled={sugerido <= 0}
+            onClick={() => set('precio', sugerido)}
+          >
+            Aplicar como precio
+          </button>
+        </div>
       </div>
 
       <div className="mt-6 flex justify-end gap-2">
