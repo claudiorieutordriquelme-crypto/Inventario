@@ -4,6 +4,7 @@ import { useDb } from '@/lib/store'
 import type { Product, ProductType, BomItem } from '@/lib/types'
 import { Card, Badge, Modal, Field, EmptyState } from '@/components/ui'
 import { BomEditor } from '@/components/BomEditor'
+import { EmbroideryPanel } from './EmbroideryPanel'
 import { clp, num } from '@/lib/format'
 import {
   addProduct,
@@ -11,7 +12,6 @@ import {
   deleteProduct,
   registrarProduccion,
   costoProducto,
-  margenProducto,
   precioSugerido,
 } from '@/lib/inventory'
 
@@ -42,7 +42,8 @@ export function ProductsTab() {
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {products.map((p) => {
-            const { costo, margenPct } = margenProducto(materials, p.bom, p.precio)
+            const costo = costoProducto(materials, p.bom) + (p.costoBordado ?? 0)
+            const margenPct = p.precio > 0 ? (p.precio - costo) / p.precio : 0
             return (
             <Card key={p.id} className="flex flex-col">
               <div className="mb-3 flex items-start justify-between">
@@ -124,9 +125,12 @@ function ProductForm({
   const [margenObjetivo, setMargenObjetivo] = useState(60)
   const set = (k: keyof typeof f, v: unknown) => setF((s) => ({ ...s, [k]: v }))
 
-  // Costo y margen en vivo segun la receta y el precio actual.
-  const costo = costoProducto(materials, f.bom)
-  const { margenMonto, margenPct } = margenProducto(materials, f.bom, f.precio)
+  // Costo y margen en vivo: insumos (receta) + bordado, contra el precio actual.
+  const costoInsumos = costoProducto(materials, f.bom)
+  const costoBord = f.costoBordado ?? 0
+  const costo = costoInsumos + costoBord
+  const margenMonto = f.precio - costo
+  const margenPct = f.precio > 0 ? margenMonto / f.precio : 0
   const sugerido = precioSugerido(costo, margenObjetivo)
 
   return (
@@ -172,12 +176,22 @@ function ProductForm({
         <BomEditor materials={materials} bom={f.bom} onChange={(bom) => set('bom', bom)} />
       </div>
 
+      <div className="mt-4">
+        <EmbroideryPanel
+          value={{ costoBordado: f.costoBordado, bordadoMetros: f.bordadoMetros, bordadoPuntadas: f.bordadoPuntadas }}
+          onChange={(patch) => setF((s) => ({ ...s, ...patch }))}
+        />
+      </div>
+
       {/* Costo, margen y precio sugerido */}
       <div className="mt-4 rounded-lg bg-surface-muted p-4">
         <div className="grid grid-cols-3 gap-3 text-center">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-ink-faint">Costo insumos</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink-faint">Costo total</p>
             <p className="text-lg font-extrabold text-ink">{clp(costo)}</p>
+            {costoBord > 0 && (
+              <p className="text-[10px] text-ink-faint">insumos {clp(costoInsumos)} + bordado {clp(costoBord)}</p>
+            )}
           </div>
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-ink-faint">Margen</p>
@@ -220,6 +234,7 @@ function ProductForm({
             nombre: f.nombre, tipo: f.tipo as ProductType, sku: f.sku, precio: f.precio,
             stock: f.stock, fotoUrl: f.fotoUrl, catalogoPublico: f.catalogoPublico,
             bom: f.bom as BomItem[], diasEntrega: f.diasEntrega,
+            costoBordado: f.costoBordado, bordadoMetros: f.bordadoMetros, bordadoPuntadas: f.bordadoPuntadas,
           })}
         >
           Guardar

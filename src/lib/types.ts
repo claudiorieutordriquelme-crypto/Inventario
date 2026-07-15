@@ -38,6 +38,9 @@ export interface Product {
   bom: BomItem[]
   diasEntrega?: number // tiempo de entrega por encargo (dias). Opcional.
   ideaId?: string // origen en Planning, si el producto nacio de una idea (evita duplicados)
+  costoBordado?: number // costo estimado del hilo de bordado (CLP), calculado desde .DST
+  bordadoMetros?: number // metros de hilo estimados del bordado
+  bordadoPuntadas?: number // n de puntadas del bordado
   createdAt: string
 }
 
