@@ -1,23 +1,28 @@
 import { useState } from 'react'
-import { Heart, Send, Trash2 } from 'lucide-react'
+import { motion } from 'framer-motion'
+import { Heart, Send, Trash2, Image as ImageIcon } from 'lucide-react'
 import { useDb, setState, uid, nowIso } from '@/lib/store'
 import type { CommunityPost } from '@/lib/types'
-import { SectionTitle, Card, EmptyState } from '@/components/ui'
+import { SectionTitle, Card, Field, EmptyState } from '@/components/ui'
+import { SmartImage } from '@/components/SmartImage'
 import { fecha } from '@/lib/format'
 
-function addPost(contenido: string, autor = 'Yo') {
+function addPost(contenido: string, imagenUrl: string, autor = 'Yo') {
   setState((db) => ({
     ...db,
     posts: [
-      { id: uid('post'), autor, contenido, imagenUrl: '', likes: 0, createdAt: nowIso() },
+      { id: uid('post'), autor, contenido, imagenUrl, likes: 0, liked: false, createdAt: nowIso() },
       ...db.posts,
     ],
   }))
 }
-function likePost(id: string) {
+// Toggle de "me gusta": suma o resta segun el estado actual.
+function toggleLike(id: string) {
   setState((db) => ({
     ...db,
-    posts: db.posts.map((p) => (p.id === id ? { ...p, likes: p.likes + 1 } : p)),
+    posts: db.posts.map((p) =>
+      p.id === id ? { ...p, liked: !p.liked, likes: p.likes + (p.liked ? -1 : 1) } : p,
+    ),
   }))
 }
 function deletePost(id: string) {
@@ -27,11 +32,13 @@ function deletePost(id: string) {
 export function CommunityPage() {
   const posts = useDb((db) => db.posts)
   const [texto, setTexto] = useState('')
+  const [imagen, setImagen] = useState('')
 
   const publicar = () => {
     if (!texto.trim()) return
-    addPost(texto.trim())
+    addPost(texto.trim(), imagen.trim())
     setTexto('')
+    setImagen('')
   }
 
   return (
@@ -46,6 +53,19 @@ export function CommunityPage() {
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
         />
+        <div className="mt-3">
+          <Field label="Foto (opcional)">
+            <div className="relative">
+              <ImageIcon size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-faint" />
+              <input
+                className="input pl-9"
+                placeholder="Pega el link de una foto"
+                value={imagen}
+                onChange={(e) => setImagen(e.target.value)}
+              />
+            </div>
+          </Field>
+        </div>
         <div className="mt-3 flex justify-end">
           <button className="btn-primary" disabled={!texto.trim()} onClick={publicar}>
             <Send size={16} /> Publicar
@@ -83,13 +103,29 @@ function PostCard({ post }: { post: CommunityPost }) {
           <Trash2 size={16} />
         </button>
       </div>
+
       <p className="mt-3 whitespace-pre-wrap text-sm text-ink-soft">{post.contenido}</p>
+
+      {post.imagenUrl && (
+        <SmartImage
+          src={post.imagenUrl}
+          alt={`Publicacion de ${post.autor}`}
+          className="mt-3 aspect-[4/3] rounded-xl border border-surface-border"
+          imgClassName="h-full object-cover"
+        />
+      )}
+
       <div className="mt-3 border-t border-surface-border pt-3">
         <button
-          className="inline-flex items-center gap-1.5 text-sm font-semibold text-ink-faint hover:text-accent"
-          onClick={() => likePost(post.id)}
+          className={`inline-flex items-center gap-1.5 text-sm font-semibold transition-colors ${
+            post.liked ? 'text-accent' : 'text-ink-faint hover:text-accent'
+          }`}
+          onClick={() => toggleLike(post.id)}
         >
-          <Heart size={16} /> {post.likes}
+          <motion.span whileTap={{ scale: 1.35 }} transition={{ type: 'spring', stiffness: 400, damping: 12 }}>
+            <Heart size={16} fill={post.liked ? 'currentColor' : 'none'} />
+          </motion.span>
+          {post.likes}
         </button>
       </div>
     </Card>

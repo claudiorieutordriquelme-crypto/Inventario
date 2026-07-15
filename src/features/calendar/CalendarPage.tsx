@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { motion } from 'framer-motion'
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { useDb } from '@/lib/store'
 import type { Database, Order } from '@/lib/types'
@@ -77,6 +78,7 @@ export function CalendarPage() {
           <VistaAnio
             db={db}
             y={cursor.y}
+            hoy={hoy}
             onOpenMonth={(m) => { setCursor((c) => ({ ...c, m })); setModo('mes') }}
           />
         )}
@@ -175,40 +177,69 @@ function VistaMes({
 function VistaAnio({
   db,
   y,
+  hoy,
   onOpenMonth,
 }: {
   db: Database
   y: number
+  hoy: Date
   onOpenMonth: (m: number) => void
 }) {
-  // Resumen por mes del ano: cantidad de pedidos y monto comprometido.
+  // Resumen por mes: cantidad, monto comprometido y monto ya entregado.
   const resumen = useMemo(() => {
-    const meses = Array.from({ length: 12 }, () => ({ q: 0, monto: 0 }))
-    for (const o of db.orders as Order[]) {
+    const meses = Array.from({ length: 12 }, () => ({ q: 0, monto: 0, entregado: 0 }))
+    for (const o of db.orders) {
       if (!o.fechaComprometida) continue
       const d = new Date(o.fechaComprometida)
       if (d.getFullYear() === y) {
-        meses[d.getMonth()].q += 1
-        meses[d.getMonth()].monto += o.monto
+        const mes = meses[d.getMonth()]
+        mes.q += 1
+        mes.monto += o.monto
+        if (o.entregadoAt) mes.entregado += o.monto
       }
     }
     return meses
   }, [db.orders, y])
 
+  const maxMonto = Math.max(1, ...resumen.map((r) => r.monto))
+
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
       {resumen.map((r, m) => {
         const nombre = new Intl.DateTimeFormat('es-CL', { month: 'long' }).format(new Date(y, m, 1))
+        const esMesActual = y === hoy.getFullYear() && m === hoy.getMonth()
+        const pctEntregado = r.monto ? (r.entregado / r.monto) * 100 : 0
         return (
           <button
             key={m}
             onClick={() => onOpenMonth(m)}
-            className="rounded-xl border border-surface-border bg-surface p-4 text-left transition-colors hover:border-primary"
+            className={`rounded-xl border bg-surface p-4 text-left transition-colors hover:border-primary ${
+              esMesActual ? 'border-primary ring-2 ring-primary' : 'border-surface-border'
+            } ${r.q === 0 ? 'opacity-60' : ''}`}
           >
-            <p className="font-bold capitalize text-ink">{nombre}</p>
+            <div className="flex items-center justify-between">
+              <p className="font-bold capitalize text-ink">{nombre}</p>
+              {esMesActual && <Badge tone="primary">Hoy</Badge>}
+            </div>
             <p className="mt-2 text-2xl font-extrabold text-ink">{r.q}</p>
             <p className="text-xs text-ink-faint">pedido(s)</p>
-            <p className="mt-2 text-sm font-semibold text-primary">{clp(r.monto)}</p>
+            {r.q > 0 && (
+              <>
+                <p className="mt-2 text-sm font-semibold text-primary">{clp(r.monto)}</p>
+                {/* Barra de carga del mes: proporcion entregada (verde) vs pendiente (azul) */}
+                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-surface-muted">
+                  <motion.div
+                    className="flex h-full"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${(r.monto / maxMonto) * 100}%` }}
+                    transition={{ duration: 0.5, ease: 'easeOut' }}
+                  >
+                    <div className="h-full bg-secondary" style={{ width: `${pctEntregado}%` }} />
+                    <div className="h-full flex-1 bg-primary" />
+                  </motion.div>
+                </div>
+              </>
+            )}
           </button>
         )
       })}

@@ -1,4 +1,4 @@
-import type { Database, Material, Product, BomItem } from './types'
+import type { Database, Material, Product, BomItem, StockMovement } from './types'
 import { setState, uid, nowIso } from './store'
 
 // -------------------------------------------------------------------------
@@ -159,10 +159,10 @@ export function registrarProduccion(productId: string, cantidad: number, usuario
     const product = db.products.find((p) => p.id === productId)
     if (!product || cantidad <= 0) return db
 
-    const movimientos = [
+    const movimientos: StockMovement[] = [
       {
-        id: uid('mov'), fecha: nowIso(), tipo: 'produccion' as const,
-        itemKind: 'product' as const, itemId: productId, cantidad,
+        id: uid('mov'), fecha: nowIso(), tipo: 'produccion',
+        itemKind: 'product', itemId: productId, cantidad,
         motivo: `Produccion de ${cantidad} ${product.nombre}`, usuario,
       },
     ]
@@ -173,7 +173,7 @@ export function registrarProduccion(productId: string, cantidad: number, usuario
       const consumo = bom.cantidad * cantidad
       movimientos.push({
         id: uid('mov'), fecha: nowIso(), tipo: 'produccion' as const,
-        itemKind: 'product' as const, itemId: m.id, cantidad: -consumo,
+        itemKind: 'material' as const, itemId: m.id, cantidad: -consumo,
         motivo: `Consumo por produccion de ${product.nombre}`, usuario,
       })
       return { ...m, stockActual: Math.max(0, m.stockActual - consumo) }

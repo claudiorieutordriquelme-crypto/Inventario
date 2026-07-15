@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { SectionTitle } from '@/components/ui'
+import { InventorySummary } from './InventorySummary'
 import { MaterialsTab } from './MaterialsTab'
 import { ProductsTab } from './ProductsTab'
 import { MovementsTab } from './MovementsTab'
@@ -21,6 +22,8 @@ export function InventoryPage() {
         title="Inventario"
         sub="Control de insumos y productos terminados con alertas por punto de reorden"
       />
+
+      <InventorySummary />
 
       <div className="flex gap-1 border-b border-surface-border">
         {tabs.map((t) => (

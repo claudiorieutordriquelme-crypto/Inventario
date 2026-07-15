@@ -103,6 +103,7 @@ export interface CommunityPost {
   contenido: string
   imagenUrl: string
   likes: number
+  liked?: boolean // estado de "me gusta" (toggle)
   createdAt: string
 }
 

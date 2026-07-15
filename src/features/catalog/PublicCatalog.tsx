@@ -118,6 +118,7 @@ export function PublicCatalog() {
                         <span className="px-3 text-center text-lg font-extrabold text-white/90">{p.nombre}</span>
                       </div>
                     )}
+                    {cover && <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-ink/55 via-transparent to-ink/20" />}
                     <div className="absolute bottom-2 left-2 rounded-lg bg-surface/95 px-2.5 py-1 text-sm font-extrabold text-ink shadow-card">
                       {clp(p.precio)}
                     </div>

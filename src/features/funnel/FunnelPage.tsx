@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import { Plus, Clock, TrendingUp, Wallet, ChevronRight, Lightbulb, Factory } from 'lucide-react'
 import { useDb } from '@/lib/store'
 import type { Order } from '@/lib/types'
@@ -19,6 +20,39 @@ import {
 } from '@/lib/funnel'
 import { IDEA_STAGES, ideasPorStage } from '@/lib/planning'
 
+// Barra de embudo: ancho relativo a la ENTRADA (primera etapa) para leer como
+// conversion real; centrada para dibujar la silueta de embudo. Muestra el % de
+// retencion respecto a la etapa anterior (accent si la caida supera 50%).
+function FunnelBar({
+  count,
+  base,
+  prev,
+  ganada,
+}: {
+  count: number
+  base: number
+  prev: number | null
+  ganada?: boolean
+}) {
+  const pct = base ? (count / base) * 100 : 0
+  const conv = prev && prev > 0 ? count / prev : null
+  return (
+    <span className="hidden flex-1 items-center justify-center gap-2 sm:flex">
+      <span className="flex h-6 flex-1 items-center justify-center">
+        <motion.span
+          className={`block h-full rounded-full ${ganada ? 'bg-secondary' : 'bg-primary'}`}
+          initial={{ width: 0 }}
+          animate={{ width: `${count ? Math.max(pct, 4) : 0}%` }}
+          transition={{ duration: 0.5, ease: 'easeOut' }}
+        />
+      </span>
+      <span className={`w-10 shrink-0 text-right text-[11px] font-semibold ${conv !== null && 1 - conv > 0.5 ? 'text-accent' : 'text-ink-faint'}`}>
+        {conv !== null ? `${Math.round(conv * 100)}%` : ''}
+      </span>
+    </span>
+  )
+}
+
 export function FunnelPage() {
   const db = useDb((d) => d)
   const stages = stagesOrdenadas(db)
@@ -28,7 +62,8 @@ export function FunnelPage() {
   const [expanded, setExpanded] = useState<string | null>(null)
   const [vista, setVista] = useState<'venta' | 'manufactura'>('venta')
 
-  const maxCount = Math.max(1, ...stages.map((s) => ordersPorEtapa(db, s.id).length))
+  const counts = stages.map((s) => ordersPorEtapa(db, s.id).length)
+  const baseCount = counts[0] ?? 0
   const totalQ = db.orders.length
   const totalMonto = db.orders.reduce((s, o) => s + o.monto, 0)
 
@@ -81,10 +116,9 @@ export function FunnelPage() {
         </div>
 
         <div className="space-y-0.5">
-          {stages.map((s) => {
+          {stages.map((s, i) => {
             const orders = ordersPorEtapa(db, s.id)
             const valor = orders.reduce((sum, o) => sum + o.monto, 0)
-            const pct = (orders.length / maxCount) * 100
             const isOpen = expanded === s.id
             return (
               <div key={s.id}>
@@ -94,12 +128,7 @@ export function FunnelPage() {
                 >
                   <ChevronRight size={16} className={`shrink-0 text-ink-faint transition-transform ${isOpen ? 'rotate-90' : ''}`} />
                   <span className="w-24 shrink-0 truncate text-sm font-semibold text-ink sm:w-28">{s.nombre}</span>
-                  <span className="hidden h-6 flex-1 overflow-hidden rounded-md bg-surface-muted sm:block">
-                    <span
-                      className={`block h-full rounded-md ${s.esGanada ? 'bg-secondary' : 'bg-primary'}`}
-                      style={{ width: `${orders.length ? Math.max(pct, 8) : 0}%` }}
-                    />
-                  </span>
+                  <FunnelBar count={orders.length} base={baseCount} prev={i > 0 ? counts[i - 1] : null} ganada={s.esGanada} />
                   <span className="w-10 shrink-0 text-right text-sm font-bold text-ink">{orders.length}</span>
                   <span className="w-24 shrink-0 text-right text-sm font-bold text-ink sm:w-28">{clp(valor)}</span>
                 </button>
@@ -163,7 +192,7 @@ function FunnelManufactura() {
   const [expanded, setExpanded] = useState<string | null>(null)
 
   const conteos = IDEA_STAGES.map((s) => ideasPorStage(db, s.id).length)
-  const maxCount = Math.max(1, ...conteos)
+  const baseCount = conteos[0] ?? 0
   const totalQ = db.ideas.length
   const totalValor = db.ideas.reduce((s, i) => s + (i.precioEstimado ?? 0), 0)
   const enProduccion = ideasPorStage(db, 'produccion').length
@@ -193,10 +222,9 @@ function FunnelManufactura() {
         </div>
 
         <div className="space-y-0.5">
-          {IDEA_STAGES.map((s) => {
+          {IDEA_STAGES.map((s, i) => {
             const ideas = ideasPorStage(db, s.id)
-            const valor = ideas.reduce((sum, i) => sum + (i.precioEstimado ?? 0), 0)
-            const pct = (ideas.length / maxCount) * 100
+            const valor = ideas.reduce((sum, x) => sum + (x.precioEstimado ?? 0), 0)
             const isOpen = expanded === s.id
             const esFinal = s.id === 'listo'
             return (
@@ -207,12 +235,7 @@ function FunnelManufactura() {
                 >
                   <ChevronRight size={16} className={`shrink-0 text-ink-faint transition-transform ${isOpen ? 'rotate-90' : ''}`} />
                   <span className="w-24 shrink-0 truncate text-sm font-semibold text-ink sm:w-28">{s.label}</span>
-                  <span className="hidden h-6 flex-1 overflow-hidden rounded-md bg-surface-muted sm:block">
-                    <span
-                      className={`block h-full rounded-md ${esFinal ? 'bg-secondary' : 'bg-primary'}`}
-                      style={{ width: `${ideas.length ? Math.max(pct, 8) : 0}%` }}
-                    />
-                  </span>
+                  <FunnelBar count={ideas.length} base={baseCount} prev={i > 0 ? conteos[i - 1] : null} ganada={esFinal} />
                   <span className="w-10 shrink-0 text-right text-sm font-bold text-ink">{ideas.length}</span>
                   <span className="w-24 shrink-0 text-right text-sm font-bold text-ink sm:w-28">{clp(valor)}</span>
                 </button>

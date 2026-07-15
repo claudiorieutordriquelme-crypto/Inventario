@@ -4,6 +4,7 @@ import { useDb } from '@/lib/store'
 import type { BomItem, ProjectIdea, IdeaStage, Prioridad } from '@/lib/types'
 import { SectionTitle, Badge, Modal, Field, EmptyState } from '@/components/ui'
 import { BomEditor } from '@/components/BomEditor'
+import { PlanningSummary } from './PlanningSummary'
 import { IDEA_STAGES, ideasPorStage, addIdea, updateIdea, deleteIdea, moverIdea } from '@/lib/planning'
 import { costoProducto, margenProducto, precioSugerido } from '@/lib/inventory'
 import { clp, num } from '@/lib/format'
@@ -21,6 +22,14 @@ export function PlanningPage() {
 
   const stageIndex = (s: IdeaStage) => IDEA_STAGES.findIndex((x) => x.id === s)
 
+  // Avanzar de etapa; si pasa a "Listo" (crea producto), pedir confirmacion.
+  const avanzar = (idea: ProjectIdea, nextStageId: IdeaStage) => {
+    if (nextStageId === 'listo' && !idea.productoCreado) {
+      if (!confirm(`Al pasar "${idea.titulo}" a Listo se creara un producto en Inventario con su receta y precio. Continuar?`)) return
+    }
+    moverIdea(idea.id, nextStageId)
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -29,6 +38,8 @@ export function PlanningPage() {
           <Plus size={16} /> Nueva idea
         </button>
       </div>
+
+      {db.ideas.length > 0 && <PlanningSummary />}
 
       {db.ideas.length === 0 ? (
         <EmptyState title="Sin ideas en desarrollo" hint="Agrega una idea y muevela por las etapas de manufactura." />
@@ -85,7 +96,7 @@ export function PlanningPage() {
                             className="btn-ghost !p-1 disabled:opacity-30"
                             disabled={idx === IDEA_STAGES.length - 1}
                             title="Avanzar etapa"
-                            onClick={() => moverIdea(idea.id, IDEA_STAGES[idx + 1].id)}
+                            onClick={() => avanzar(idea, IDEA_STAGES[idx + 1].id)}
                           >
                             <ChevronRight size={16} />
                           </button>
