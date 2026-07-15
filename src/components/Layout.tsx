@@ -13,10 +13,12 @@ import {
   LogOut,
   Lightbulb,
   CalendarDays,
+  HelpCircle,
 } from 'lucide-react'
 import { useDb, clearCloudSession } from '@/lib/store'
 import { buildNotifications } from '@/lib/notifications'
 import { NotificationsPanel } from '@/features/notifications/NotificationsPanel'
+import { HelpModal } from '@/components/HelpModal'
 import { isCloud } from '@/lib/supabase'
 import { useSession, signOut } from '@/lib/auth'
 
@@ -34,6 +36,7 @@ const nav = [
 export function Layout({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
   const location = useLocation()
   const { session } = useSession()
   const notifs = useDb((db) => buildNotifications(db))
@@ -93,7 +96,15 @@ export function Layout({ children }: { children: ReactNode }) {
           </button>
           <h1 className="text-lg font-bold text-ink">{title}</h1>
           <button
-            className="btn-ghost relative ml-auto !p-2"
+            className="btn-ghost ml-auto !p-2"
+            onClick={() => setHelpOpen(true)}
+            aria-label="Ayuda de esta seccion"
+            title="Como funciona esta seccion"
+          >
+            <HelpCircle size={20} />
+          </button>
+          <button
+            className="btn-ghost relative !p-2"
             onClick={() => setNotifOpen(true)}
             aria-label="Notificaciones"
           >
@@ -127,6 +138,7 @@ export function Layout({ children }: { children: ReactNode }) {
       </div>
 
       <NotificationsPanel open={notifOpen} onClose={() => setNotifOpen(false)} />
+      <HelpModal open={helpOpen} pathname={location.pathname} onClose={() => setHelpOpen(false)} />
     </div>
   )
 }
