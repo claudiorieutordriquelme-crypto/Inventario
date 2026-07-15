@@ -1,33 +1,21 @@
 import { type ReactNode, useEffect, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { isCloud } from '@/lib/supabase'
-import { useSession } from '@/lib/auth'
 import { initCloud } from '@/lib/store'
-import { LoginScreen } from './LoginScreen'
 
-// Puerta de acceso. En modo local deja pasar directo. En modo nube exige
-// sesion y espera a que se hidraten los datos del usuario.
+// Acceso directo (sin login). En modo nube, hidrata los datos compartidos al
+// arrancar y muestra un loader mientras carga. En modo local pasa directo.
 export function AuthGate({ children }: { children: ReactNode }) {
-  const { session, loading } = useSession()
   const [ready, setReady] = useState(!isCloud)
-
-  const userId = session?.user?.id
 
   useEffect(() => {
     if (!isCloud) return
-    if (userId) {
-      setReady(false)
-      initCloud(userId).then(() => setReady(true))
-    } else {
-      setReady(false)
-    }
-  }, [userId])
+    initCloud()
+      .then(() => setReady(true))
+      .catch(() => setReady(true))
+  }, [])
 
-  if (!isCloud) return <>{children}</>
-
-  if (loading) return <Splash text="Iniciando..." />
-  if (!session) return <LoginScreen />
-  if (!ready) return <Splash text="Cargando tus datos..." />
+  if (!ready) return <Splash text="Cargando datos..." />
   return <>{children}</>
 }
 

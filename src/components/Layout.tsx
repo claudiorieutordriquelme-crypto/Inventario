@@ -10,17 +10,15 @@ import {
   Bell,
   Menu,
   X,
-  LogOut,
   Lightbulb,
   CalendarDays,
   HelpCircle,
 } from 'lucide-react'
-import { useDb, clearCloudSession } from '@/lib/store'
+import { useDb } from '@/lib/store'
 import { buildNotifications } from '@/lib/notifications'
 import { NotificationsPanel } from '@/features/notifications/NotificationsPanel'
 import { HelpModal } from '@/components/HelpModal'
 import { isCloud } from '@/lib/supabase'
-import { useSession, signOut } from '@/lib/auth'
 
 const nav = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -38,7 +36,6 @@ export function Layout({ children }: { children: ReactNode }) {
   const [notifOpen, setNotifOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
   const location = useLocation()
-  const { session } = useSession()
   const notifs = useDb((db) => buildNotifications(db))
   const criticos = notifs.filter((n) => n.severity === 'critico').length
   const title = nav.find((n) => (n.end ? location.pathname === n.to : location.pathname.startsWith(n.to) && n.to !== '/'))?.label ?? 'Dashboard'
@@ -80,7 +77,7 @@ export function Layout({ children }: { children: ReactNode }) {
           ))}
         </nav>
         <div className="absolute bottom-0 w-full px-5 py-4 text-xs text-white/40">
-          {isCloud ? 'Nube - multiusuario' : 'Datos locales - listo para nube'}
+          {isCloud ? 'Nube - acceso directo' : 'Datos locales'}
         </div>
       </aside>
 
@@ -119,20 +116,6 @@ export function Layout({ children }: { children: ReactNode }) {
               </span>
             )}
           </button>
-          {isCloud && session && (
-            <>
-              <span className="hidden max-w-[14rem] truncate text-sm text-ink-faint sm:block">
-                {session.user.email}
-              </span>
-              <button
-                className="btn-ghost !p-2"
-                title="Cerrar sesion"
-                onClick={async () => { await signOut(); clearCloudSession() }}
-              >
-                <LogOut size={18} />
-              </button>
-            </>
-          )}
         </header>
         <main className="flex-1 overflow-y-auto p-4 lg:p-8">{children}</main>
       </div>

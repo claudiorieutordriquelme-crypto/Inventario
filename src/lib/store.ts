@@ -57,9 +57,8 @@ function persistLocal(db: Database) {
   }
 }
 
-// En modo nube arranca vacio hasta que AuthGate llame a initCloud().
+// En modo nube arranca vacio hasta que el arranque (AuthGate) llame a initCloud().
 let state: Database = isCloud ? emptyDb() : loadLocal()
-let currentUserId: string | null = null
 const listeners = new Set<() => void>()
 
 function emit() {
@@ -81,9 +80,9 @@ export function setState(producer: (draft: Database) => Database) {
   const next = producer(prev)
   state = next
   emit()
-  if (isCloud && currentUserId) {
+  if (isCloud) {
     void syncDiff(prev, next)
-  } else if (!isCloud) {
+  } else {
     persistLocal(next)
   }
 }
@@ -126,8 +125,9 @@ interface Identifiable {
 }
 
 // Sincroniza los cambios entre dos estados hacia Supabase (upsert + delete).
+// Modo nube compartida: sin owner (acceso publico via anon key).
 async function syncDiff(prev: Database, next: Database) {
-  if (!supabase || !currentUserId) return
+  if (!supabase) return
   for (const table of TABLES) {
     const prevArr = prev[table] as unknown as Identifiable[]
     const nextArr = next[table] as unknown as Identifiable[]
@@ -140,7 +140,7 @@ async function syncDiff(prev: Database, next: Database) {
         const before = prevMap.get(o.id)
         return !before || JSON.stringify(before) !== JSON.stringify(o)
       })
-      .map((o) => ({ id: o.id, owner: currentUserId, data: o }))
+      .map((o) => ({ id: o.id, data: o }))
 
     // Filas eliminadas
     const deletes = prevArr.filter((o) => !nextIds.has(o.id)).map((o) => o.id)
@@ -160,11 +160,9 @@ async function syncDiff(prev: Database, next: Database) {
   }
 }
 
-// Descarga los datos del usuario. Si la cuenta esta vacia, siembra datos de
-// ejemplo (equivalente al primer arranque en local).
-export async function initCloud(userId: string): Promise<void> {
+// Descarga los datos compartidos. Si esta vacio, siembra las etapas del funnel.
+export async function initCloud(): Promise<void> {
   if (!supabase) return
-  currentUserId = userId
 
   const fetched = emptyDb()
   let total = 0
@@ -192,12 +190,7 @@ export async function initCloud(userId: string): Promise<void> {
   }
 }
 
-export function clearCloudSession() {
-  currentUserId = null
-  state = emptyDb()
-  emit()
-}
-
+// Sin autenticacion: no hay usuario. Se mantiene por compatibilidad de la UI.
 export function getCurrentUserId(): string | null {
-  return currentUserId
+  return null
 }
