@@ -1,11 +1,12 @@
 import { Link } from 'react-router-dom'
-import { Clock, TrendingUp, Wallet, AlertTriangle, Truck, CalendarCheck } from 'lucide-react'
+import { Clock, TrendingUp, Wallet, AlertTriangle, Truck, CalendarCheck, Sparkles } from 'lucide-react'
 import { useDb } from '@/lib/store'
 import { Card, StatTile, SectionTitle, Badge } from '@/components/ui'
 import { clp, num, fechaCorta, diasHasta } from '@/lib/format'
 import { valorInventario, materialesEnAlerta } from '@/lib/inventory'
 import { cycleTime, tasaConversion, pipelineValor, stagesOrdenadas, ordersPorEtapa, ventasPorMes, cumplimientoPlazo } from '@/lib/funnel'
 import { entregasPendientes } from '@/lib/notifications'
+import { cargarEjemplos } from '@/lib/demo'
 
 export function Dashboard() {
   const db = useDb((d) => d)
@@ -23,10 +24,18 @@ export function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <SectionTitle
-        title="Resumen del negocio"
-        sub="Vision general de inventario, ventas y entregas"
-      />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <SectionTitle
+          title="Resumen del negocio"
+          sub="Vision general de inventario, ventas y entregas"
+        />
+        <button
+          className="btn-outline"
+          onClick={() => { if (confirm('Cargar un ejemplo en cada seccion (insumo, producto, cliente, pedido, idea, catalogo, comunidad)?')) cargarEjemplos() }}
+        >
+          <Sparkles size={16} /> Cargar datos de ejemplo
+        </button>
+      </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <StatTile
