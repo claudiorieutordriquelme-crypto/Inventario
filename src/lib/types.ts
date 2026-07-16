@@ -27,6 +27,7 @@ export interface Product {
   id: string
   nombre: string
   tipo: ProductType
+  categoria?: string // categoria del producto (ej: Bolso, Neceser, Toalla bordada)
   sku: string
   precio: number // CLP
   stock: number

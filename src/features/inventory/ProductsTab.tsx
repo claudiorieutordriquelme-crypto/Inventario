@@ -13,12 +13,13 @@ import {
   registrarProduccion,
   costoProducto,
   precioSugerido,
+  CATEGORIAS_PRODUCTO,
 } from '@/lib/inventory'
 
 const TIPOS: ProductType[] = ['crochet', 'estampado', 'otro']
 
 const empty: Omit<Product, 'id' | 'createdAt'> = {
-  nombre: '', tipo: 'crochet', sku: '', precio: 0, stock: 0, fotoUrl: '',
+  nombre: '', tipo: 'crochet', categoria: '', sku: '', precio: 0, stock: 0, fotoUrl: '',
   catalogoPublico: false, bom: [], diasEntrega: 7,
 }
 
@@ -49,7 +50,7 @@ export function ProductsTab() {
               <div className="mb-3 flex items-start justify-between">
                 <div>
                   <p className="font-bold text-ink">{p.nombre}</p>
-                  <p className="text-xs text-ink-faint">{p.sku || 'sin SKU'}</p>
+                  <p className="text-xs text-ink-faint">{p.categoria ? `${p.categoria} - ` : ''}{p.sku || 'sin SKU'}</p>
                 </div>
                 <Badge tone={p.tipo === 'crochet' ? 'primary' : 'accent'}>{p.tipo}</Badge>
               </div>
@@ -139,6 +140,14 @@ function ProductForm({
         <div className="col-span-2">
           <Field label="Nombre">
             <input className="input" value={f.nombre} onChange={(e) => set('nombre', e.target.value)} />
+          </Field>
+        </div>
+        <div className="col-span-2">
+          <Field label="Categoria">
+            <select className="input" value={f.categoria ?? ''} onChange={(e) => set('categoria', e.target.value)}>
+              <option value="">Sin categoria</option>
+              {CATEGORIAS_PRODUCTO.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
           </Field>
         </div>
         <Field label="Tipo">
@@ -231,7 +240,7 @@ function ProductForm({
           className="btn-primary"
           disabled={!f.nombre.trim()}
           onClick={() => onSave({
-            nombre: f.nombre, tipo: f.tipo as ProductType, sku: f.sku, precio: f.precio,
+            nombre: f.nombre, tipo: f.tipo as ProductType, categoria: f.categoria, sku: f.sku, precio: f.precio,
             stock: f.stock, fotoUrl: f.fotoUrl, catalogoPublico: f.catalogoPublico,
             bom: f.bom as BomItem[], diasEntrega: f.diasEntrega,
             costoBordado: f.costoBordado, bordadoMetros: f.bordadoMetros, bordadoPuntadas: f.bordadoPuntadas,

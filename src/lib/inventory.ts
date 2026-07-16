@@ -1,6 +1,19 @@
 import type { Database, Material, Product, BomItem, StockMovement } from './types'
 import { setState, uid, nowIso } from './store'
 
+// Categorias de producto (que ES el producto), separado del tipo/tecnica.
+export const CATEGORIAS_PRODUCTO = [
+  'Funda de libro',
+  'Funda de PC',
+  'Toalla bordada',
+  'Neceser',
+  'Estuche',
+  'Polera estampada',
+  'Bolso',
+  'Funda cojines',
+  'Cover sofa',
+] as const
+
 // -------------------------------------------------------------------------
 // Marco de gestion de inventario: Punto de Reorden (ROP).
 // ROP = demanda_promedio_diaria * lead_time + stock_seguridad  (ASCM/APICS).
