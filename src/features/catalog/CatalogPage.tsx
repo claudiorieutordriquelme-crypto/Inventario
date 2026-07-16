@@ -53,6 +53,7 @@ export function CatalogPage() {
   const products = useDb((db) => db.products)
   const [search, setSearch] = useState('')
   const [filtro, setFiltro] = useState<Filtro>('todos')
+  const [catFiltro, setCatFiltro] = useState('')
   const [soloPublicos, setSoloPublicos] = useState(false)
   const [sharing, setSharing] = useState<Product | null>(null)
   const [editGallery, setEditGallery] = useState<Product | null>(null)
@@ -68,15 +69,22 @@ export function CatalogPage() {
   }, [])
   const guardarWsp = (v: string) => { setWsp(v); localStorage.setItem(WSP_KEY, v) }
 
+  // Categorias presentes en los productos (para el filtro).
+  const categorias = useMemo(
+    () => Array.from(new Set(products.map((p) => p.categoria).filter(Boolean))) as string[],
+    [products],
+  )
+
   const visibles = useMemo(() => {
     const q = search.trim().toLowerCase()
     return products.filter((p) => {
       if (filtro !== 'todos' && p.tipo !== filtro) return false
+      if (catFiltro && p.categoria !== catFiltro) return false
       if (soloPublicos && !p.catalogoPublico) return false
       if (q && !p.nombre.toLowerCase().includes(q) && !p.sku.toLowerCase().includes(q)) return false
       return true
     })
-  }, [products, search, filtro, soloPublicos])
+  }, [products, search, filtro, catFiltro, soloPublicos])
 
   const filtros: { id: Filtro; label: string }[] = [
     { id: 'todos', label: 'Todos' },
@@ -130,6 +138,16 @@ export function CatalogPage() {
               </button>
             ))}
           </div>
+          {categorias.length > 0 && (
+            <select
+              className="input w-auto"
+              value={catFiltro}
+              onChange={(e) => setCatFiltro(e.target.value)}
+            >
+              <option value="">Todas las categorias</option>
+              {categorias.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          )}
           <label className="flex items-center gap-2 whitespace-nowrap text-sm text-ink-soft">
             <input type="checkbox" checked={soloPublicos} onChange={(e) => setSoloPublicos(e.target.checked)} />
             Solo publicados
@@ -290,6 +308,7 @@ function ProductoCard({
         <p className="mt-1 flex items-center gap-1 text-xs text-ink-faint">
           <Clock size={12} /> {entregaLabel(p)}
         </p>
+        {p.categoria && <p className="mt-0.5 text-xs font-medium text-primary">{p.categoria}</p>}
         {p.descripcion && <p className="mt-1.5 line-clamp-2 text-xs text-ink-soft">{p.descripcion}</p>}
         <div className="mt-3 flex gap-2">
           <button className="btn-accent flex-1 !py-1.5 text-xs" onClick={pedir}>
