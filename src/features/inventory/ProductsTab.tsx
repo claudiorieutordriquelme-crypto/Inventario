@@ -4,7 +4,6 @@ import { useDb } from '@/lib/store'
 import type { Product, ProductType, BomItem } from '@/lib/types'
 import { Card, Badge, Modal, Field, EmptyState } from '@/components/ui'
 import { BomEditor } from '@/components/BomEditor'
-import { EmbroideryPanel } from './EmbroideryPanel'
 import { clp, num } from '@/lib/format'
 import {
   addProduct,
@@ -183,13 +182,6 @@ function ProductForm({
       <div className="mt-5">
         <p className="label">Receta de insumos (BOM) - cantidad usada por unidad producida</p>
         <BomEditor materials={materials} bom={f.bom} onChange={(bom) => set('bom', bom)} />
-      </div>
-
-      <div className="mt-4">
-        <EmbroideryPanel
-          value={{ costoBordado: f.costoBordado, bordadoMetros: f.bordadoMetros, bordadoPuntadas: f.bordadoPuntadas }}
-          onChange={(patch) => setF((s) => ({ ...s, ...patch }))}
-        />
       </div>
 
       {/* Costo, margen y precio sugerido */}
